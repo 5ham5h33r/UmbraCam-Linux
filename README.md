@@ -36,15 +36,17 @@ UmbraCam IR Camera (Google Meet / Zoom / Teams camera list)
 
 ## Development checks
 
-Run the non-installing source probe from Windows PowerShell 5.1:
+Build first, then run the non-installing hardware probe:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\probe-ir.ps1
+.\scripts\build-native.ps1
+.\scripts\probe-ir.ps1
 ```
 
 The probe opens the first Media Foundation infrared source, reads one frame,
-prints its dimensions and pixel format, then closes it. It creates no virtual
-device and changes no driver settings.
+prints its dimensions, then closes it. It creates no virtual device and changes
+no driver settings. It uses the exact native MTA and Direct3D-surface conversion
+path as the publisher; this is required by newer Realtek Windows Hello stacks.
 
 ## Build and run
 

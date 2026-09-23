@@ -189,10 +189,15 @@ winrt::hstring FindInfraredDeviceId(MediaFrameSourceGroup const& group) {
 }
 
 MediaFrameSource FindInfraredSource(MediaCapture const& capture) {
-    for (const auto& item : capture.FrameSources()) {
-        if (item.Value().Info().SourceKind() == MediaFrameSourceKind::Infrared) {
-            return item.Value();
+    // Realtek's camera pipeline can complete initialization slightly before
+    // it publishes FrameSources. Wait a short bounded interval for the map.
+    for (int attempt = 0; attempt < 20; ++attempt) {
+        for (const auto& item : capture.FrameSources()) {
+            if (item.Value().Info().SourceKind() == MediaFrameSourceKind::Infrared) {
+                return item.Value();
+            }
         }
+        Sleep(100);
     }
     return nullptr;
 }
@@ -225,7 +230,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int) {
     HANDLE stopEvent = nullptr;
 
     try {
-        init_apartment(apartment_type::single_threaded);
+        // MediaCapture's frame pipeline on the Realtek Windows Hello stack
+        // is delivered from a worker/MTA context. The app still owns the
+        // privacy error UI below, but capture itself must not block an STA.
+        init_apartment(apartment_type::multi_threaded);
         host = StartVirtualCameraHost();
         stopEvent = CreateEventW(nullptr, TRUE, FALSE, IRCAM_STOP_EVENT_NAME);
 
@@ -233,7 +241,6 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int) {
         auto settings = MediaCaptureInitializationSettings();
         settings.SourceGroup(infraredGroup);
         settings.StreamingCaptureMode(StreamingCaptureMode::Video);
-        settings.MemoryPreference(MediaCaptureMemoryPreference::Cpu);
         MediaCapture capture;
         // Windows displays its first-use consent dialog from this STA UI thread.
         settings.SharingMode(MediaCaptureSharingMode::ExclusiveControl);
@@ -254,7 +261,6 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int) {
             auto deviceSettings = MediaCaptureInitializationSettings();
             deviceSettings.VideoDeviceId(FindInfraredDeviceId(infraredGroup));
             deviceSettings.StreamingCaptureMode(StreamingCaptureMode::Video);
-            deviceSettings.MemoryPreference(MediaCaptureMemoryPreference::Cpu);
             capture = MediaCapture();
             deviceSettings.SharingMode(MediaCaptureSharingMode::ExclusiveControl);
             try {
@@ -280,7 +286,12 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int) {
         while (g_running) {
             if (auto frame = reader.TryAcquireLatestFrame()) {
                 if (auto video = frame.VideoMediaFrame()) {
-                    if (auto bitmap = video.SoftwareBitmap()) {
+                    auto bitmap = video.SoftwareBitmap();
+                    if (!bitmap && video.Direct3DSurface()) {
+                        bitmap = SoftwareBitmap::CreateCopyFromSurfaceAsync(
+                            video.Direct3DSurface()).get();
+                    }
+                    if (bitmap) {
                         writer.Publish(bitmap);
                     }
                 }
