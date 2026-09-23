@@ -200,7 +200,16 @@ void ShowCameraAccessError(hresult_error const& error) {
 
 } // namespace
 
-int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
+int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int) {
+    if (commandLine && wcscmp(commandLine, L"--stop") == 0) {
+        HANDLE stopEvent = OpenEventW(EVENT_MODIFY_STATE, FALSE, IRCAM_STOP_EVENT_NAME);
+        if (stopEvent) {
+            SetEvent(stopEvent);
+            CloseHandle(stopEvent);
+        }
+        return 0;
+    }
+
     SetConsoleCtrlHandler(OnConsoleControl, TRUE);
     PROCESS_INFORMATION host{};
     HANDLE stopEvent = nullptr;

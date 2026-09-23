@@ -66,6 +66,11 @@ Camera privacy settings page; it never changes a Windows privacy setting itself.
 
 Once UmbraCam is running, select **UmbraCam IR Camera** in Google Meet. The
 virtual camera is session-scoped and disappears cleanly when the bridge exits.
+Stop the publisher after the call with:
+
+```powershell
+.\build\umbracam.exe --stop
+```
 
 To remove the registration later, run `.\scripts\uninstall.ps1`; it also asks
 for UAC consent.
