@@ -1,5 +1,7 @@
 [CmdletBinding()]
-param()
+param(
+    [switch] $ListGroups
+)
 
 $ErrorActionPreference = 'Stop'
 
@@ -61,9 +63,34 @@ $groups = Get-AsyncResult `
     ([Windows.Media.Capture.Frames.MediaFrameSourceGroup]::FindAllAsync()) `
     ([System.Collections.Generic.IReadOnlyList[Windows.Media.Capture.Frames.MediaFrameSourceGroup]])
 
+if ($ListGroups) {
+    foreach ($candidate in $groups) {
+        [pscustomobject]@{
+            GroupName = $candidate.DisplayName
+            GroupId = $candidate.Id
+            Sources = @($candidate.SourceInfos | ForEach-Object {
+                "$($_.SourceKind) | $($_.Id) | $($_.DeviceInformation.Name) | $($_.DeviceInformation.Id)"
+            }) -join "`n"
+        } | Format-List
+    }
+    return
+}
+
+# Some Windows Hello drivers publish both a composite Color+IR group and an
+# IR-only group. The composite group can advertise IR yet expose no frames to
+# ordinary MediaCapture clients; prefer the dedicated IR group when present.
 $group = $groups | Where-Object {
-    $_.SourceInfos | Where-Object SourceKind -eq $infrared
+    $sources = @($_.SourceInfos)
+    $sources.Count -gt 0 -and
+    @($sources | Where-Object SourceKind -eq $infrared).Count -gt 0 -and
+    @($sources | Where-Object SourceKind -ne $infrared).Count -eq 0
 } | Select-Object -First 1
+
+if ($null -eq $group) {
+    $group = $groups | Where-Object {
+        $_.SourceInfos | Where-Object SourceKind -eq $infrared
+    } | Select-Object -First 1
+}
 
 if ($null -eq $group) {
     throw 'No Media Foundation infrared source was found. Confirm the Windows Hello IR driver is enabled.'
@@ -86,7 +113,10 @@ try {
         Where-Object { $_.Info.SourceKind -eq $infrared } |
         Select-Object -First 1
     if ($null -eq $source) {
-        throw "The '$($group.DisplayName)' group opened but did not expose an infrared source."
+        $available = @($capture.FrameSources.Values | ForEach-Object {
+            "$($_.Info.SourceKind):$($_.Info.Id)"
+        }) -join ', '
+        throw "The '$($group.DisplayName)' group opened but did not expose an infrared source. Available sources: $available"
     }
 
     $reader = Get-AsyncResult `

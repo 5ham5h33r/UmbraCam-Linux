@@ -145,7 +145,28 @@ PROCESS_INFORMATION StartVirtualCameraHost() {
 }
 
 MediaFrameSourceGroup FindInfraredGroup() {
-    for (const auto& group : MediaFrameSourceGroup::FindAllAsync().get()) {
+    const auto groups = MediaFrameSourceGroup::FindAllAsync().get();
+
+    // Drivers such as Realtek's Windows Hello stack can expose a composite
+    // Color+IR group before the direct IR UVC group. The former may advertise
+    // IR but not surface frames to standard MediaCapture clients. Prefer a
+    // group consisting solely of IR sources, then retain the generic fallback.
+    for (const auto& group : groups) {
+        bool hasInfrared = false;
+        bool hasNonInfrared = false;
+        for (const auto& source : group.SourceInfos()) {
+            if (source.SourceKind() == MediaFrameSourceKind::Infrared) {
+                hasInfrared = true;
+            } else {
+                hasNonInfrared = true;
+            }
+        }
+        if (hasInfrared && !hasNonInfrared) {
+            return group;
+        }
+    }
+
+    for (const auto& group : groups) {
         for (const auto& source : group.SourceInfos()) {
             if (source.SourceKind() == MediaFrameSourceKind::Infrared) {
                 return group;
