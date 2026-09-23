@@ -10,4 +10,6 @@ reference implementations for API behavior and interoperability:
 - Felipe Ramm's webcam-wallpaper virtual camera
   https://github.com/feliperamm/webcam-wallpaper
 
-No source from those projects is included in this initial probe feature.
+The native virtual-camera foundation in `native/` is derived from the
+MIT-licensed `webcam-wallpaper` virtual camera implementation. Its original
+copyright and license are reproduced in `THIRD_PARTY_NOTICES.md`.

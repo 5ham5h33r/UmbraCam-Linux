@@ -10,9 +10,8 @@ Foundation virtual-camera source publishes a separate, standard camera device.
 
 ## Status
 
-The project is being developed in small, reviewable feature branches. The
-first feature is an IR capture probe that verifies the Media Foundation source
-and captures one frame before virtual-camera work begins.
+The project is being developed in small, reviewable feature branches. It now
+contains the native virtual-camera foundation and a consent-owning IR publisher.
 
 ## Architecture
 
@@ -46,6 +45,28 @@ powershell -ExecutionPolicy Bypass -File .\scripts\probe-ir.ps1
 The probe opens the first Media Foundation infrared source, reads one frame,
 prints its dimensions and pixel format, then closes it. It creates no virtual
 device and changes no driver settings.
+
+## Build and run
+
+Build from Windows PowerShell, then run the installer. It displays the normal
+Windows UAC prompt because the Frame Server needs a machine-wide registration:
+
+```powershell
+.\scripts\build-native.ps1
+.\scripts\install.ps1
+.\build\g14ir-bridge.exe
+```
+
+On first launch, the bridge initializes `MediaCapture` from its STA UI thread,
+which asks Windows for camera consent when consent has not already been
+decided. If access is blocked, it opens the Camera privacy settings page rather
+than changing a Windows privacy setting itself.
+
+Once the bridge is running, select **G14 IR Camera** in Google Meet. The
+virtual camera is session-scoped and disappears cleanly when the bridge exits.
+
+To remove the registration later, run `.\scripts\uninstall.ps1`; it also asks
+for UAC consent.
 
 ## Safety
 
