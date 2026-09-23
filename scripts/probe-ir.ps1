@@ -100,7 +100,7 @@ $settings = [Windows.Media.Capture.MediaCaptureInitializationSettings]::new()
 $settings.SourceGroup = $group
 $settings.StreamingCaptureMode = [Windows.Media.Capture.StreamingCaptureMode]::Video
 $settings.MemoryPreference = [Windows.Media.Capture.MediaCaptureMemoryPreference]::Cpu
-$settings.SharingMode = [Windows.Media.Capture.MediaCaptureSharingMode]::SharedReadOnly
+$settings.SharingMode = [Windows.Media.Capture.MediaCaptureSharingMode]::ExclusiveControl
 $infraredDeviceId = ($group.SourceInfos |
     Where-Object SourceKind -eq $infrared |
     Select-Object -First 1).DeviceInformation.Id
@@ -111,7 +111,19 @@ $frame = $null
 $selection = 'MediaFrameSourceGroup'
 
 try {
-    Complete-AsyncAction ($capture.InitializeAsync($settings))
+    try {
+        Complete-AsyncAction ($capture.InitializeAsync($settings))
+    }
+    catch {
+        # Realtek Windows Hello cameras can withhold their media frames in
+        # shared mode. Request ownership first, then use shared access only
+        # when the driver rejects exclusive control.
+        $capture.Dispose()
+        $capture = [Windows.Media.Capture.MediaCapture]::new()
+        $settings.SharingMode = [Windows.Media.Capture.MediaCaptureSharingMode]::SharedReadOnly
+        Complete-AsyncAction ($capture.InitializeAsync($settings))
+        $selection = 'MediaFrameSourceGroup (SharedReadOnly fallback)'
+    }
 
     $source = $capture.FrameSources.Values |
         Where-Object { $_.Info.SourceKind -eq $infrared } |
@@ -126,12 +138,23 @@ try {
         $deviceSettings.VideoDeviceId = $infraredDeviceId
         $deviceSettings.StreamingCaptureMode = [Windows.Media.Capture.StreamingCaptureMode]::Video
         $deviceSettings.MemoryPreference = [Windows.Media.Capture.MediaCaptureMemoryPreference]::Cpu
-        $deviceSettings.SharingMode = [Windows.Media.Capture.MediaCaptureSharingMode]::SharedReadOnly
-        Complete-AsyncAction ($capture.InitializeAsync($deviceSettings))
+        $deviceSettings.SharingMode = [Windows.Media.Capture.MediaCaptureSharingMode]::ExclusiveControl
+        try {
+            Complete-AsyncAction ($capture.InitializeAsync($deviceSettings))
+        }
+        catch {
+            $capture.Dispose()
+            $capture = [Windows.Media.Capture.MediaCapture]::new()
+            $deviceSettings.SharingMode = [Windows.Media.Capture.MediaCaptureSharingMode]::SharedReadOnly
+            Complete-AsyncAction ($capture.InitializeAsync($deviceSettings))
+            $selection = 'VideoDeviceId (SharedReadOnly fallback)'
+        }
         $source = $capture.FrameSources.Values |
             Where-Object { $_.Info.SourceKind -eq $infrared } |
             Select-Object -First 1
-        $selection = 'VideoDeviceId fallback'
+        if ($selection -eq 'MediaFrameSourceGroup') {
+            $selection = 'VideoDeviceId (ExclusiveControl)'
+        }
     }
     if ($null -eq $source) {
         $available = @($capture.FrameSources.Values | ForEach-Object {

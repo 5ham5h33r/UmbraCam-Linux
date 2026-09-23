@@ -234,11 +234,17 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int) {
         settings.SourceGroup(infraredGroup);
         settings.StreamingCaptureMode(StreamingCaptureMode::Video);
         settings.MemoryPreference(MediaCaptureMemoryPreference::Cpu);
-        settings.SharingMode(MediaCaptureSharingMode::SharedReadOnly);
-
         MediaCapture capture;
         // Windows displays its first-use consent dialog from this STA UI thread.
-        capture.InitializeAsync(settings).get();
+        settings.SharingMode(MediaCaptureSharingMode::ExclusiveControl);
+        try {
+            capture.InitializeAsync(settings).get();
+        } catch (hresult_error const&) {
+            capture.Close();
+            capture = MediaCapture();
+            settings.SharingMode(MediaCaptureSharingMode::SharedReadOnly);
+            capture.InitializeAsync(settings).get();
+        }
         auto source = FindInfraredSource(capture);
         if (!source) {
             // Certain Windows Hello stacks enumerate their IR source group but
@@ -249,9 +255,16 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int) {
             deviceSettings.VideoDeviceId(FindInfraredDeviceId(infraredGroup));
             deviceSettings.StreamingCaptureMode(StreamingCaptureMode::Video);
             deviceSettings.MemoryPreference(MediaCaptureMemoryPreference::Cpu);
-            deviceSettings.SharingMode(MediaCaptureSharingMode::SharedReadOnly);
             capture = MediaCapture();
-            capture.InitializeAsync(deviceSettings).get();
+            deviceSettings.SharingMode(MediaCaptureSharingMode::ExclusiveControl);
+            try {
+                capture.InitializeAsync(deviceSettings).get();
+            } catch (hresult_error const&) {
+                capture.Close();
+                capture = MediaCapture();
+                deviceSettings.SharingMode(MediaCaptureSharingMode::SharedReadOnly);
+                capture.InitializeAsync(deviceSettings).get();
+            }
             source = FindInfraredSource(capture);
         }
         if (!source) {
