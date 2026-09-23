@@ -1,8 +1,6 @@
 // umbracam-host: elevated installer helper for the Windows virtual camera.
 //
-// Windows can deny session-scoped virtual-camera registration to an unpackaged
-// desktop publisher despite allowing that publisher to capture physical frames.
-// The installer therefore creates a system-lifetime, all-users device once;
+// The installer creates a system-lifetime, all-users device once;
 // umbracam.exe remains an ordinary user process that only captures and
 // publishes Windows Hello IR frames.
 

@@ -12,6 +12,8 @@ Foundation virtual-camera source publishes a separate, standard camera device.
 
 The project is being developed in small, reviewable feature branches. It now
 contains the native virtual-camera foundation and a consent-owning IR publisher.
+Physical IR capture has passed on the development laptop. Virtual-camera
+installation and end-to-end video are still undergoing hardware validation.
 
 ## Architecture
 
@@ -62,8 +64,14 @@ Windows UAC prompt because the Frame Server needs a machine-wide registration:
 .\build\umbracam.exe
 ```
 
+Setup copies the media-source runtime into `Program Files\UmbraCam` and grants
+the Windows camera service read/execute access to that runtime. It does not
+change access to your Documents folder. Setup prints the elevated process log
+back to the calling terminal and saves it as `build\setup-<id>.log`. Success
+requires the camera enumeration check to pass.
+
 On first launch, the bridge requests camera access by initializing
-`MediaCapture` from its STA UI thread. Windows can show its consent UI when the
+`MediaCapture` from a multithreaded apartment. Windows can show its consent UI when the
 system supports per-app consent. For an unpackaged desktop app, Windows may
 instead rely on the system-wide **Let desktop apps access your camera** switch.
 If access is blocked, UmbraCam displays its own explanation and opens the
@@ -80,6 +88,8 @@ Stop the publisher after the call with:
 
 To remove the registration later, run `.\scripts\uninstall.ps1`; it also asks
 for UAC consent.
+Uninstall removes the virtual device and COM registration; versioned runtime
+files remain in Program Files so a loaded camera DLL is not deleted in use.
 
 ## Safety
 

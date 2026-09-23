@@ -58,6 +58,30 @@ try {
     Start-Transcript -LiteralPath $LogPath -Force | Out-Null
     $transcriptStarted = $true
     if ($Action -eq 'install') {
+        # FrameServer runs as LocalService, which cannot read private user
+        # profile directories. Copy the runtime into a protected machine
+        # location instead of granting access to the user's Documents tree.
+        $runtimeRoot = Join-Path $env:ProgramFiles 'UmbraCam'
+        $version = (Get-FileHash -LiteralPath $dll -Algorithm SHA256).Hash.ToLowerInvariant()
+        $runtimeDirectory = Join-Path $runtimeRoot $version
+        $null = New-Item -ItemType Directory -Path $runtimeDirectory -Force
+        $runtimeAcl = Get-Acl -LiteralPath $runtimeDirectory
+        $serviceSid = [Security.Principal.SecurityIdentifier]::new('S-1-5-19')
+        $serviceRead = [Security.AccessControl.FileSystemAccessRule]::new(
+            $serviceSid, 'ReadAndExecute', 'ContainerInherit,ObjectInherit', 'None', 'Allow')
+        $runtimeAcl.SetAccessRule($serviceRead)
+        Set-Acl -LiteralPath $runtimeDirectory -AclObject $runtimeAcl
+        foreach ($runtimeFile in @($dll, $cameraHelper, $probe)) {
+            $destination = Join-Path $runtimeDirectory (Split-Path -Leaf $runtimeFile)
+            # Do not overwrite a DLL already loaded by FrameServer when the
+            # installed bytes are identical. Changed DLLs get a new directory.
+            if (-not (Test-Path -LiteralPath $destination) -or
+                (Get-FileHash -LiteralPath $destination).Hash -ne (Get-FileHash -LiteralPath $runtimeFile).Hash) {
+                Copy-Item -LiteralPath $runtimeFile -Destination $destination -Force
+            }
+        }
+        $dll = Join-Path $runtimeDirectory 'IRCameraBridgeVCam.dll'
+        Write-Host "Registering media source: $dll"
         $registration = Start-Process -FilePath "$env:WINDIR\System32\regsvr32.exe" -ArgumentList "/s `"$dll`"" -Wait -PassThru
         if ($registration.ExitCode -ne 0) {
             throw "Media-source registration failed: $($registration.ExitCode)"
@@ -75,6 +99,10 @@ try {
         & $cameraHelper --uninstall
         if ($LASTEXITCODE -ne 0) {
             throw "Virtual-camera removal failed: $LASTEXITCODE"
+        }
+        $registeredSource = Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Classes\CLSID\{19E90705-FD06-4443-9F30-68F97F09FC9E}\InprocServer32' -ErrorAction SilentlyContinue
+        if ($registeredSource -and (Test-Path -LiteralPath $registeredSource.'(default)')) {
+            $dll = $registeredSource.'(default)'
         }
         $registration = Start-Process -FilePath "$env:WINDIR\System32\regsvr32.exe" -ArgumentList "/u /s `"$dll`"" -Wait -PassThru
         if ($registration.ExitCode -ne 0) {
