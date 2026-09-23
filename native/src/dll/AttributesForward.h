@@ -3,7 +3,7 @@
 // attribute methods still need bodies. This macro forwards them to an inner
 // store created with MFCreateAttributes.
 
-#define G14IR_FORWARD_IMFATTRIBUTES(store)                                                         \
+#define IRCAM_FORWARD_IMFATTRIBUTES(store)                                                         \
     IFACEMETHODIMP GetItem(REFGUID k, PROPVARIANT* v) override { return (store)->GetItem(k, v); } \
     IFACEMETHODIMP GetItemType(REFGUID k, MF_ATTRIBUTE_TYPE* t) override {                         \
         return (store)->GetItemType(k, t);                                                         \

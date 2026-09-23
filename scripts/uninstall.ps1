@@ -16,7 +16,7 @@ if (-not (Test-Administrator)) {
 }
 
 $root = Split-Path -Parent $PSScriptRoot
-$dll = Join-Path $root 'build\G14IrBridgeVCam.dll'
+$dll = Join-Path $root 'build\IRCameraBridgeVCam.dll'
 if (-not (Test-Path -LiteralPath $dll)) {
     throw "The built DLL was not found: $dll"
 }
@@ -26,4 +26,4 @@ if ($LASTEXITCODE -ne 0) {
     throw "Virtual-camera removal failed with exit code $LASTEXITCODE"
 }
 
-Write-Host 'G14 IR Camera was removed.'
+Write-Host 'IR Camera Bridge was removed.'

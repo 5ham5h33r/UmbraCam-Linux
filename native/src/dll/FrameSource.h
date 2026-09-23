@@ -1,6 +1,6 @@
 #pragma once
-// Reads the latest frame published by the G14 IR Camera app through the shared
-// memory section described in g14ir_protocol.h. Runs inside the Frame Server
+// Reads the latest frame published by the IR Camera Bridge app through the shared
+// memory section described in ir_camera_protocol.h. Runs inside the Frame Server
 // service, so THIS side creates the Global\ section (services hold the
 // SeCreateGlobalPrivilege; user apps only open the section).
 
@@ -10,7 +10,7 @@
 #include <mutex>
 #include <vector>
 
-#include "g14ir_protocol.h"
+#include "ir_camera_protocol.h"
 
 class FrameSource {
 public:

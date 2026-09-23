@@ -1,5 +1,5 @@
 #pragma once
-// The COM class registered under G14IR_CLSID_STRING. The Frame Server
+// The COM class registered under IRCAM_CLSID_STRING. The Frame Server
 // CoCreates it and calls ActivateObject to obtain the media source.
 
 #include <windows.h>
@@ -31,7 +31,7 @@ public:
     IFACEMETHODIMP DetachObject() override;
 
     // IMFAttributes
-    G14IR_FORWARD_IMFATTRIBUTES(_attributes)
+    IRCAM_FORWARD_IMFATTRIBUTES(_attributes)
 
 private:
     std::mutex _lock;

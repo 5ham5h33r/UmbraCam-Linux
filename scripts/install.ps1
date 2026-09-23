@@ -16,7 +16,7 @@ if (-not (Test-Administrator)) {
 }
 
 $root = Split-Path -Parent $PSScriptRoot
-$dll = Join-Path $root 'build\G14IrBridgeVCam.dll'
+$dll = Join-Path $root 'build\IRCameraBridgeVCam.dll'
 if (-not (Test-Path -LiteralPath $dll)) {
     throw "Build the project first: .\scripts\build-native.ps1"
 }
@@ -26,4 +26,4 @@ if ($LASTEXITCODE -ne 0) {
     throw "Virtual-camera registration failed with exit code $LASTEXITCODE"
 }
 
-Write-Host 'G14 IR Camera is installed. Launch .\build\g14ir-bridge.exe to request camera access and publish the camera.'
+Write-Host 'IR Camera Bridge is installed. Launch .\build\ir_camera-bridge.exe to request camera access and publish the camera.'

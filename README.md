@@ -1,10 +1,10 @@
-# G14 IR Camera Bridge
+# Windows Hello IR Camera Bridge
 
-`G14 IR Camera Bridge` will make the Windows Hello infrared sensor on an ASUS
-ROG Zephyrus G14 available to Google Meet, Zoom, Teams, and other webcam
-clients as a dedicated **G14 IR Camera** device.
+`Windows Hello IR Camera Bridge` makes a Windows Hello infrared sensor
+available to Google Meet, Zoom, Teams, and other webcam clients as a dedicated
+**IR Camera Bridge** device.
 
-It does not alter the ASUS camera driver and does not use OBS.  The physical
+It does not alter the laptop's OEM camera driver and does not use OBS. The physical
 IR sensor remains a Windows Hello sensor camera; a native Windows 11 Media
 Foundation virtual-camera source publishes a separate, standard camera device.
 
@@ -16,15 +16,15 @@ contains the native virtual-camera foundation and a consent-owning IR publisher.
 ## Architecture
 
 ```text
-USB2.0 IR UVC WebCam (Windows Hello sensor)
+Windows Hello IR camera
         |  WinRT MediaFrameReader, SourceKind=Infrared
         v
-G14 IR Camera Bridge publisher
-        |  grayscale conversion and de-flicker
+Windows Hello IR Camera Bridge publisher
+        |  grayscale conversion
         v
 Native Media Foundation virtual camera
         v
-G14 IR Camera (Google Meet / Zoom / Teams camera list)
+IR Camera Bridge (Google Meet / Zoom / Teams camera list)
 ```
 
 ## Prerequisites
@@ -54,7 +54,7 @@ Windows UAC prompt because the Frame Server needs a machine-wide registration:
 ```powershell
 .\scripts\build-native.ps1
 .\scripts\install.ps1
-.\build\g14ir-bridge.exe
+.\build\ir_camera-bridge.exe
 ```
 
 On first launch, the bridge initializes `MediaCapture` from its STA UI thread,
@@ -62,7 +62,7 @@ which asks Windows for camera consent when consent has not already been
 decided. If access is blocked, it opens the Camera privacy settings page rather
 than changing a Windows privacy setting itself.
 
-Once the bridge is running, select **G14 IR Camera** in Google Meet. The
+Once the bridge is running, select **IR Camera Bridge** in Google Meet. The
 virtual camera is session-scoped and disappears cleanly when the bridge exits.
 
 To remove the registration later, run `.\scripts\uninstall.ps1`; it also asks

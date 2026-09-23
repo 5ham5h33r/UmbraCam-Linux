@@ -7,7 +7,7 @@
 namespace {
 
 // SYSTEM, admins, Local Service (the Frame Server itself) and the interactive
-// user get full access; the interactive user is the G14 IR Camera app writing
+// user get full access; the interactive user is the IR Camera Bridge app writing
 // frames.
 constexpr wchar_t kSectionSddl[] =
     L"D:(A;;GA;;;SY)(A;;GA;;;BA)(A;;GA;;;LS)(A;;GA;;;IU)";
@@ -44,23 +44,23 @@ bool FrameSource::EnsureMapping() {
 
     _mapping = CreateFileMappingW(INVALID_HANDLE_VALUE,
                                   sa.lpSecurityDescriptor ? &sa : nullptr,
-                                  PAGE_READWRITE, 0, G14IR_SHM_SIZE, G14IR_SHM_NAME);
+                                  PAGE_READWRITE, 0, IRCAM_SHM_SIZE, IRCAM_SHM_NAME);
     if (sd != nullptr) {
         LocalFree(sd);
     }
     if (_mapping == nullptr) {
         // Fall back to opening a section someone else created.
-        _mapping = OpenFileMappingW(FILE_MAP_READ, FALSE, G14IR_SHM_NAME);
+        _mapping = OpenFileMappingW(FILE_MAP_READ, FALSE, IRCAM_SHM_NAME);
         if (_mapping == nullptr) {
             return false;
         }
     }
 
     _view = static_cast<volatile uint8_t*>(
-        MapViewOfFile(_mapping, FILE_MAP_ALL_ACCESS, 0, 0, G14IR_SHM_SIZE));
+        MapViewOfFile(_mapping, FILE_MAP_ALL_ACCESS, 0, 0, IRCAM_SHM_SIZE));
     if (_view == nullptr) {
         _view = static_cast<volatile uint8_t*>(
-            MapViewOfFile(_mapping, FILE_MAP_READ, 0, 0, G14IR_SHM_SIZE));
+            MapViewOfFile(_mapping, FILE_MAP_READ, 0, 0, IRCAM_SHM_SIZE));
     }
     return _view != nullptr;
 }
@@ -77,14 +77,14 @@ bool FrameSource::CopyLatest() {
         }
         MemoryBarrier();
 
-        if (ReadU32(_view, 0) != G14IR_MAGIC || ReadU32(_view, 4) != G14IR_VERSION) {
+        if (ReadU32(_view, 0) != IRCAM_MAGIC || ReadU32(_view, 4) != IRCAM_VERSION) {
             return false;  // app has not published yet
         }
         uint32_t width = ReadU32(_view, 8);
         uint32_t height = ReadU32(_view, 12);
         uint32_t format = ReadU32(_view, 24);
-        if (width == 0 || height == 0 || width > G14IR_MAX_WIDTH ||
-            height > G14IR_MAX_HEIGHT || format != G14IR_FMT_BGRA) {
+        if (width == 0 || height == 0 || width > IRCAM_MAX_WIDTH ||
+            height > IRCAM_MAX_HEIGHT || format != IRCAM_FMT_BGRA) {
             return false;
         }
 
@@ -92,7 +92,7 @@ bool FrameSource::CopyLatest() {
         if (_frame.size() < bytes) {
             _frame.resize(bytes);
         }
-        memcpy(_frame.data(), const_cast<uint8_t*>(_view) + G14IR_HEADER_SIZE, bytes);
+        memcpy(_frame.data(), const_cast<uint8_t*>(_view) + IRCAM_HEADER_SIZE, bytes);
 
         MemoryBarrier();
         uint32_t seq2 = ReadU32(_view, 28);

@@ -1,4 +1,4 @@
-// COM entry points and self-registration for the G14IrBridgeVCam media source.
+// COM entry points and self-registration for the IRCameraBridgeVCam media source.
 //
 // Registration must live under HKLM (not HKCU): the Frame Server service
 // runs as a different user and resolves the CLSID through the machine hive.
@@ -11,7 +11,7 @@
 #include <cstring>
 
 #include "Activator.h"
-#include "g14ir_protocol.h"
+#include "ir_camera_protocol.h"
 
 using namespace Microsoft::WRL;
 
@@ -21,8 +21,8 @@ namespace {
 
 HINSTANCE g_instance = nullptr;
 
-constexpr wchar_t kClsidRoot[] = L"Software\\Classes\\CLSID\\" G14IR_CLSID_STRING;
-constexpr wchar_t kDescription[] = L"G14 IR Camera Virtual Camera Media Source";
+constexpr wchar_t kClsidRoot[] = L"Software\\Classes\\CLSID\\" IRCAM_CLSID_STRING;
+constexpr wchar_t kDescription[] = L"IR Camera Bridge Virtual Camera Media Source";
 
 HRESULT SetRegistryValue(HKEY root, const wchar_t* subkey, const wchar_t* name,
                          const wchar_t* value) {

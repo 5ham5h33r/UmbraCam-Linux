@@ -1,8 +1,8 @@
-// g14ir-host: registers a session-lifetime "G14 IR Camera" with the
+// ir_camera-host: registers a session-lifetime "IR Camera Bridge" with the
 // Windows Frame Server and keeps it alive until stopped (Ctrl+C, or the
 // named stop event signaled by the app).
 //
-// Requires Windows 11 and the G14IrBridgeVCam media source DLL to be
+// Requires Windows 11 and the IRCameraBridgeVCam media source DLL to be
 // COM-registered - see the project README.
 
 #include <windows.h>
@@ -15,7 +15,7 @@
 
 #include <cstdio>
 
-#include "g14ir_protocol.h"
+#include "ir_camera_protocol.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -37,8 +37,8 @@ static void PrintHr(const wchar_t* what, HRESULT hr) {
     }
     if (hr == REGDB_E_CLASSNOTREG) {
         fwprintf(stderr,
-                 L"  hint: the G14IrBridgeVCam media source DLL is not registered.\n"
-                 L"  Run from an elevated prompt: regsvr32 G14IrBridgeVCam.dll\n");
+                 L"  hint: the IRCameraBridgeVCam media source DLL is not registered.\n"
+                 L"  Run from an elevated prompt: regsvr32 IRCameraBridgeVCam.dll\n");
     }
 }
 
@@ -62,8 +62,8 @@ int wmain() {
         hr = MFCreateVirtualCamera(MFVirtualCameraType_SoftwareCameraSource,
                                    MFVirtualCameraLifetime_Session,
                                    MFVirtualCameraAccess_CurrentUser,
-                                   G14IR_FRIENDLY_NAME,
-                                   G14IR_CLSID_STRING,
+                                   IRCAM_FRIENDLY_NAME,
+                                   IRCAM_CLSID_STRING,
                                    nullptr, 0, &camera);
         if (FAILED(hr)) {
             PrintHr(L"MFCreateVirtualCamera", hr);
@@ -76,11 +76,11 @@ int wmain() {
             } else {
                 g_stopEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
                 HANDLE externalStop =
-                    CreateEventW(nullptr, TRUE, FALSE, G14IR_STOP_EVENT_NAME);
+                    CreateEventW(nullptr, TRUE, FALSE, IRCAM_STOP_EVENT_NAME);
                 SetConsoleCtrlHandler(OnConsoleCtrl, TRUE);
 
                 wprintf(L"\"%s\" is live - select it in your meeting app.\n",
-                        G14IR_FRIENDLY_NAME);
+                        IRCAM_FRIENDLY_NAME);
                 wprintf(L"Press Ctrl+C to stop.\n");
 
                 HANDLE waits[2] = {g_stopEvent, externalStop};

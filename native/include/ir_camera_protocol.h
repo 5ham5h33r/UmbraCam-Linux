@@ -1,7 +1,7 @@
 #pragma once
 /*
- * Shared-memory frame transport between the G14 IR Camera app (writer) and the
- * G14IrBridgeVCam media source (reader), which the Windows Frame Server loads
+ * Shared-memory frame transport between the IR Camera Bridge app (writer) and the
+ * IRCameraBridgeVCam media source (reader), which the Windows Frame Server loads
  * inside its own service process.
  *
  * The READER creates the section: services may create objects in the Global\
@@ -10,38 +10,38 @@
  * interactive user read/write access; the app then opens it and publishes
  * frames under a seqlock.
  *
- * The companion publisher mirrors this layout. Bump G14IR_VERSION on any
+ * The companion publisher mirrors this layout. Bump IRCAM_VERSION on any
  * incompatible change.
  */
 
 #include <stdint.h>
 
-#define G14IR_FRIENDLY_NAME   L"G14 IR Camera"
-#define G14IR_CLSID_STRING    L"{19E90705-FD06-4443-9F30-68F97F09FC9E}"
-#define G14IR_SHM_NAME        L"Global\\G14IrBridgeVCam_v1"
-#define G14IR_STOP_EVENT_NAME L"Local\\G14IrBridgeVCam_Stop"
+#define IRCAM_FRIENDLY_NAME   L"IR Camera Bridge"
+#define IRCAM_CLSID_STRING    L"{19E90705-FD06-4443-9F30-68F97F09FC9E}"
+#define IRCAM_SHM_NAME        L"Global\\IRCameraBridgeVCam_v1"
+#define IRCAM_STOP_EVENT_NAME L"Local\\IRCameraBridgeVCam_Stop"
 
-#define G14IR_MAGIC        0x31435657u /* 'WVC1' little-endian */
-#define G14IR_VERSION      1u
-#define G14IR_MAX_WIDTH    1920u
-#define G14IR_MAX_HEIGHT   1080u
-#define G14IR_HEADER_SIZE  64u
-#define G14IR_SHM_SIZE     (G14IR_HEADER_SIZE + G14IR_MAX_WIDTH * G14IR_MAX_HEIGHT * 4u)
+#define IRCAM_MAGIC        0x31435657u /* 'WVC1' little-endian */
+#define IRCAM_VERSION      1u
+#define IRCAM_MAX_WIDTH    1920u
+#define IRCAM_MAX_HEIGHT   1080u
+#define IRCAM_HEADER_SIZE  64u
+#define IRCAM_SHM_SIZE     (IRCAM_HEADER_SIZE + IRCAM_MAX_WIDTH * IRCAM_MAX_HEIGHT * 4u)
 
-enum g14ir_pixel_format : uint32_t {
-    G14IR_FMT_BGRA = 0,
+enum ir_camera_pixel_format : uint32_t {
+    IRCAM_FMT_BGRA = 0,
 };
 
 /*
  * Byte offsets inside the shared section (all values little-endian):
  *
- *    0  u32 magic       G14IR_MAGIC once the writer has published a frame
- *    4  u32 version     G14IR_VERSION
+ *    0  u32 magic       IRCAM_MAGIC once the writer has published a frame
+ *    4  u32 version     IRCAM_VERSION
  *    8  u32 width
  *   12  u32 height
  *   16  u32 fps_num
  *   20  u32 fps_den
- *   24  u32 format      g14ir_pixel_format
+ *   24  u32 format      ir_camera_pixel_format
  *   28  u32 seq         seqlock: odd while the writer is mid-update
  *   32  u64 frame_id    increments once per published frame
  *   40  u64 qpc_100ns   writer timestamp in 100 ns units
@@ -55,7 +55,7 @@ enum g14ir_pixel_format : uint32_t {
  */
 
 #pragma pack(push, 4)
-typedef struct g14ir_header {
+typedef struct ir_camera_header {
     uint32_t magic;
     uint32_t version;
     uint32_t width;
@@ -67,7 +67,7 @@ typedef struct g14ir_header {
     volatile uint64_t frame_id;
     uint64_t qpc_100ns;
     uint8_t  reserved[16];
-} g14ir_header;
+} ir_camera_header;
 #pragma pack(pop)
 
-static_assert(sizeof(g14ir_header) == G14IR_HEADER_SIZE, "header must stay 64 bytes");
+static_assert(sizeof(ir_camera_header) == IRCAM_HEADER_SIZE, "header must stay 64 bytes");

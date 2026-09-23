@@ -5,7 +5,7 @@
 using RegisterServer = HRESULT(STDAPICALLTYPE*)();
 
 int wmain() {
-    HMODULE module = LoadLibraryW(L"G14IrBridgeVCam.dll");
+    HMODULE module = LoadLibraryW(L"IRCameraBridgeVCam.dll");
     if (!module) {
         const auto error = GetLastError();
         fwprintf(stderr, L"LoadLibraryW failed: 0x%08lX\n", HRESULT_FROM_WIN32(error));
