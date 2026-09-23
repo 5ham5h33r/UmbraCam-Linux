@@ -284,6 +284,9 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int) {
 
         SharedFrameWriter writer;
         while (g_running) {
+            if (stopEvent && WaitForSingleObject(stopEvent, 0) == WAIT_OBJECT_0) {
+                break;
+            }
             if (auto frame = reader.TryAcquireLatestFrame()) {
                 if (auto video = frame.VideoMediaFrame()) {
                     auto bitmap = video.SoftwareBitmap();

@@ -48,6 +48,9 @@ prints its dimensions, then closes it. It creates no virtual device and changes
 no driver settings. It uses the exact native MTA and Direct3D-surface conversion
 path as the publisher; this is required by newer Realtek Windows Hello stacks.
 
+After launching UmbraCam, verify its session-scoped virtual device is available
+to standard camera clients with `build\umbracam-probe.exe --check-virtual-camera`.
+
 ## Build and run
 
 Build from Windows PowerShell, then run the installer. It displays the normal

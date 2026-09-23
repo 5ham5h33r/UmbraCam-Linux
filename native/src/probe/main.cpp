@@ -3,6 +3,10 @@
 
 #include <windows.h>
 
+#include <mfapi.h>
+#include <mfidl.h>
+#include <wrl/client.h>
+
 #include <winrt/base.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
@@ -14,9 +18,9 @@
 #include <cstdio>
 
 using namespace winrt;
-using namespace Windows::Graphics::Imaging;
-using namespace Windows::Media::Capture;
-using namespace Windows::Media::Capture::Frames;
+using namespace winrt::Windows::Graphics::Imaging;
+using namespace winrt::Windows::Media::Capture;
+using namespace winrt::Windows::Media::Capture::Frames;
 
 namespace {
 
@@ -55,9 +59,52 @@ MediaFrameSource WaitForInfraredSource(MediaCapture const& capture) {
     return nullptr;
 }
 
+int CheckVirtualCameraRegistration() {
+    HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    if (FAILED(hr)) {
+        fwprintf(stderr, L"Camera enumeration: FAIL (0x%08X)\n", static_cast<unsigned>(hr));
+        return 1;
+    }
+    hr = MFStartup(MF_VERSION);
+    if (FAILED(hr)) {
+        CoUninitialize();
+        fwprintf(stderr, L"Camera enumeration: FAIL (0x%08X)\n", static_cast<unsigned>(hr));
+        return 1;
+    }
+
+    Microsoft::WRL::ComPtr<IMFAttributes> attributes;
+    IMFActivate** devices = nullptr;
+    UINT32 count = 0;
+    bool found = false;
+    if (SUCCEEDED(MFCreateAttributes(&attributes, 1)) &&
+        SUCCEEDED(attributes->SetGUID(MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE,
+                                      MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID)) &&
+        SUCCEEDED(MFEnumDeviceSources(attributes.Get(), &devices, &count))) {
+        for (UINT32 index = 0; index < count; ++index) {
+            LPWSTR name = nullptr;
+            UINT32 length = 0;
+            if (SUCCEEDED(devices[index]->GetAllocatedString(
+                    MF_DEVSOURCE_ATTRIBUTE_FRIENDLY_NAME, &name, &length))) {
+                found |= wcscmp(name, L"UmbraCam IR Camera") == 0;
+                CoTaskMemFree(name);
+            }
+            devices[index]->Release();
+        }
+    }
+    CoTaskMemFree(devices);
+    MFShutdown();
+    CoUninitialize();
+
+    wprintf(L"Virtual camera enumeration: %s\n", found ? L"PASS" : L"NOT FOUND");
+    return found ? 0 : 1;
+}
+
 } // namespace
 
-int wmain() {
+int wmain(int argc, wchar_t** argv) {
+    if (argc == 2 && wcscmp(argv[1], L"--check-virtual-camera") == 0) {
+        return CheckVirtualCameraRegistration();
+    }
     try {
         init_apartment(apartment_type::multi_threaded);
         const auto group = FindInfraredGroup();

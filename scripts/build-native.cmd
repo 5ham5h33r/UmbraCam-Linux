@@ -27,5 +27,5 @@ if errorlevel 1 exit /b %errorlevel%
 cl /nologo /std:c++20 /EHsc /I "%ROOT%\native\include" /I "%CPPWINRT%" /Fo:"%BUILD%\umbracam.obj" "%ROOT%\native\src\bridge\main.cpp" /Fe:"%BUILD%\umbracam.exe" /link windowsapp.lib runtimeobject.lib shell32.lib user32.lib
 if errorlevel 1 exit /b %errorlevel%
 
-cl /nologo /std:c++20 /EHsc /I "%CPPWINRT%" /Fo:"%BUILD%\umbracam-probe.obj" "%ROOT%\native\src\probe\main.cpp" /Fe:"%BUILD%\umbracam-probe.exe" /link windowsapp.lib runtimeobject.lib
+cl /nologo /std:c++20 /EHsc /I "%CPPWINRT%" /Fo:"%BUILD%\umbracam-probe.obj" "%ROOT%\native\src\probe\main.cpp" /Fe:"%BUILD%\umbracam-probe.exe" /link windowsapp.lib runtimeobject.lib mf.lib mfplat.lib mfuuid.lib ole32.lib
 exit /b %errorlevel%
