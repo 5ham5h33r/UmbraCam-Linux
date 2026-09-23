@@ -89,6 +89,8 @@ int wmain(int argc, wchar_t** argv) {
 
     if (camera) {
         camera->Shutdown();
+        // Release COM objects before shutting down their runtime/apartment.
+        camera.Reset();
     }
     MFShutdown();
     CoUninitialize();
