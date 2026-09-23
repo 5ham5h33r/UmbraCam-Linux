@@ -101,10 +101,14 @@ $settings.SourceGroup = $group
 $settings.StreamingCaptureMode = [Windows.Media.Capture.StreamingCaptureMode]::Video
 $settings.MemoryPreference = [Windows.Media.Capture.MediaCaptureMemoryPreference]::Cpu
 $settings.SharingMode = [Windows.Media.Capture.MediaCaptureSharingMode]::SharedReadOnly
+$infraredDeviceId = ($group.SourceInfos |
+    Where-Object SourceKind -eq $infrared |
+    Select-Object -First 1).DeviceInformation.Id
 
 $capture = [Windows.Media.Capture.MediaCapture]::new()
 $reader = $null
 $frame = $null
+$selection = 'MediaFrameSourceGroup'
 
 try {
     Complete-AsyncAction ($capture.InitializeAsync($settings))
@@ -113,10 +117,27 @@ try {
         Where-Object { $_.Info.SourceKind -eq $infrared } |
         Select-Object -First 1
     if ($null -eq $source) {
+        # Some Windows Hello drivers advertise a MediaFrameSourceGroup but do
+        # not populate its FrameSources map. Retry through the underlying IR
+        # device ID without ever falling back to the regular colour camera.
+        $capture.Dispose()
+        $capture = [Windows.Media.Capture.MediaCapture]::new()
+        $deviceSettings = [Windows.Media.Capture.MediaCaptureInitializationSettings]::new()
+        $deviceSettings.VideoDeviceId = $infraredDeviceId
+        $deviceSettings.StreamingCaptureMode = [Windows.Media.Capture.StreamingCaptureMode]::Video
+        $deviceSettings.MemoryPreference = [Windows.Media.Capture.MediaCaptureMemoryPreference]::Cpu
+        $deviceSettings.SharingMode = [Windows.Media.Capture.MediaCaptureSharingMode]::SharedReadOnly
+        Complete-AsyncAction ($capture.InitializeAsync($deviceSettings))
+        $source = $capture.FrameSources.Values |
+            Where-Object { $_.Info.SourceKind -eq $infrared } |
+            Select-Object -First 1
+        $selection = 'VideoDeviceId fallback'
+    }
+    if ($null -eq $source) {
         $available = @($capture.FrameSources.Values | ForEach-Object {
             "$($_.Info.SourceKind):$($_.Info.Id)"
         }) -join ', '
-        throw "The '$($group.DisplayName)' group opened but did not expose an infrared source. Available sources: $available"
+        throw "The '$($group.DisplayName)' IR device did not expose an infrared source through either capture path. Available sources: $available"
     }
 
     $reader = Get-AsyncResult `
@@ -138,6 +159,7 @@ try {
     $bitmap = $frame.VideoMediaFrame.SoftwareBitmap
     [pscustomobject]@{
         SourceGroup = $group.DisplayName
+        Selection = $selection
         SourceId = $source.Info.Id
         Width = $bitmap.PixelWidth
         Height = $bitmap.PixelHeight

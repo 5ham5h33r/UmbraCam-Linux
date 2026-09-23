@@ -11,6 +11,7 @@
 #include <winrt/base.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
+#include <winrt/Windows.Devices.Enumeration.h>
 #include <winrt/Windows.Graphics.Imaging.h>
 #include <winrt/Windows.Media.Capture.h>
 #include <winrt/Windows.Media.Capture.Frames.h>
@@ -177,14 +178,23 @@ MediaFrameSourceGroup FindInfraredGroup() {
                         L"No Windows Hello infrared camera was found.");
 }
 
+winrt::hstring FindInfraredDeviceId(MediaFrameSourceGroup const& group) {
+    for (const auto& source : group.SourceInfos()) {
+        if (source.SourceKind() == MediaFrameSourceKind::Infrared) {
+            return source.DeviceInformation().Id();
+        }
+    }
+    throw hresult_error(HRESULT_FROM_WIN32(ERROR_NOT_FOUND),
+                        L"The selected camera group has no infrared device.");
+}
+
 MediaFrameSource FindInfraredSource(MediaCapture const& capture) {
     for (const auto& item : capture.FrameSources()) {
         if (item.Value().Info().SourceKind() == MediaFrameSourceKind::Infrared) {
             return item.Value();
         }
     }
-    throw hresult_error(HRESULT_FROM_WIN32(ERROR_NOT_FOUND),
-                        L"The selected camera group has no infrared video source.");
+    return nullptr;
 }
 
 void ShowCameraAccessError(hresult_error const& error) {
@@ -219,8 +229,9 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int) {
         host = StartVirtualCameraHost();
         stopEvent = CreateEventW(nullptr, TRUE, FALSE, IRCAM_STOP_EVENT_NAME);
 
+        const auto infraredGroup = FindInfraredGroup();
         auto settings = MediaCaptureInitializationSettings();
-        settings.SourceGroup(FindInfraredGroup());
+        settings.SourceGroup(infraredGroup);
         settings.StreamingCaptureMode(StreamingCaptureMode::Video);
         settings.MemoryPreference(MediaCaptureMemoryPreference::Cpu);
         settings.SharingMode(MediaCaptureSharingMode::SharedReadOnly);
@@ -228,7 +239,26 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int) {
         MediaCapture capture;
         // Windows displays its first-use consent dialog from this STA UI thread.
         capture.InitializeAsync(settings).get();
-        auto reader = capture.CreateFrameReaderAsync(FindInfraredSource(capture)).get();
+        auto source = FindInfraredSource(capture);
+        if (!source) {
+            // Certain Windows Hello stacks enumerate their IR source group but
+            // leave FrameSources empty. Retry with the physical IR device ID;
+            // never substitute the ordinary colour webcam.
+            capture.Close();
+            auto deviceSettings = MediaCaptureInitializationSettings();
+            deviceSettings.VideoDeviceId(FindInfraredDeviceId(infraredGroup));
+            deviceSettings.StreamingCaptureMode(StreamingCaptureMode::Video);
+            deviceSettings.MemoryPreference(MediaCaptureMemoryPreference::Cpu);
+            deviceSettings.SharingMode(MediaCaptureSharingMode::SharedReadOnly);
+            capture = MediaCapture();
+            capture.InitializeAsync(deviceSettings).get();
+            source = FindInfraredSource(capture);
+        }
+        if (!source) {
+            throw hresult_error(HRESULT_FROM_WIN32(ERROR_NOT_FOUND),
+                                L"The Windows Hello IR device exposed no infrared frame source.");
+        }
+        auto reader = capture.CreateFrameReaderAsync(source).get();
         if (reader.StartAsync().get() != MediaFrameReaderStartStatus::Success) {
             throw hresult_error(E_FAIL, L"The infrared frame reader did not start.");
         }
