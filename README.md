@@ -48,8 +48,8 @@ prints its dimensions, then closes it. It creates no virtual device and changes
 no driver settings. It uses the exact native MTA and Direct3D-surface conversion
 path as the publisher; this is required by newer Realtek Windows Hello stacks.
 
-After launching UmbraCam, verify its session-scoped virtual device is available
-to standard camera clients with `build\umbracam-probe.exe --check-virtual-camera`.
+After installation, verify that the standard virtual camera is available to
+camera clients with `build\umbracam-probe.exe --check-virtual-camera`.
 
 ## Build and run
 
@@ -69,8 +69,9 @@ instead rely on the system-wide **Let desktop apps access your camera** switch.
 If access is blocked, UmbraCam displays its own explanation and opens the
 Camera privacy settings page; it never changes a Windows privacy setting itself.
 
-Once UmbraCam is running, select **UmbraCam IR Camera** in Google Meet. The
-virtual camera is session-scoped and disappears cleanly when the bridge exits.
+Once UmbraCam is installed, **UmbraCam IR Camera** is a normal camera option
+alongside the laptop's FHD camera. Launch the publisher before a call so it
+can provide IR frames, then select **UmbraCam IR Camera** in Google Meet.
 Stop the publisher after the call with:
 
 ```powershell

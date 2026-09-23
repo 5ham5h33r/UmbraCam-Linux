@@ -1,15 +1,14 @@
-// umbracam-host: registers a session-lifetime UmbraCam IR camera with the
-// Windows Frame Server and keeps it alive until stopped (Ctrl+C, or the
-// named stop event signaled by the app).
+// umbracam-host: elevated installer helper for the Windows virtual camera.
 //
-// Requires Windows 11 and the IRCameraBridgeVCam media source DLL to be
-// COM-registered - see the project README.
+// Windows can deny session-scoped virtual-camera registration to an unpackaged
+// desktop publisher despite allowing that publisher to capture physical frames.
+// The installer therefore creates a system-lifetime, all-users device once;
+// umbracam.exe remains an ordinary user process that only captures and
+// publishes Windows Hello IR frames.
 
 #include <windows.h>
 
 #include <mfapi.h>
-#include <mferror.h>
-#include <mfidl.h>
 #include <mfvirtualcamera.h>
 #include <wrl/client.h>
 
@@ -19,30 +18,38 @@
 
 using Microsoft::WRL::ComPtr;
 
-static HANDLE g_stopEvent = nullptr;
+namespace {
 
-static BOOL WINAPI OnConsoleCtrl(DWORD) {
-    if (g_stopEvent) {
-        SetEvent(g_stopEvent);
-    }
-    return TRUE;
-}
-
-static void PrintHr(const wchar_t* what, HRESULT hr) {
-    fwprintf(stderr, L"%s failed: 0x%08lX\n", what, static_cast<unsigned long>(hr));
+void PrintHr(const wchar_t* operation, HRESULT hr) {
+    fwprintf(stderr, L"%s failed: 0x%08lX\n", operation,
+             static_cast<unsigned long>(hr));
     if (hr == E_ACCESSDENIED) {
-        fwprintf(stderr,
-                 L"  hint: check Settings > Privacy & security > Camera\n"
-                 L"  (camera access must be enabled for desktop apps)\n");
+        fwprintf(stderr, L"  hint: run the UmbraCam installer from an Administrator prompt.\n");
     }
     if (hr == REGDB_E_CLASSNOTREG) {
         fwprintf(stderr,
-                 L"  hint: the IRCameraBridgeVCam media source DLL is not registered.\n"
-                 L"  Run from an elevated prompt: regsvr32 IRCameraBridgeVCam.dll\n");
+                 L"  hint: the IRCameraBridgeVCam media source DLL is not registered.\n");
     }
 }
 
-int wmain() {
+HRESULT OpenInstalledCamera(ComPtr<IMFVirtualCamera>& camera) {
+    return MFCreateVirtualCamera(MFVirtualCameraType_SoftwareCameraSource,
+                                 MFVirtualCameraLifetime_System,
+                                 MFVirtualCameraAccess_AllUsers,
+                                 IRCAM_FRIENDLY_NAME,
+                                 IRCAM_CLSID_STRING,
+                                 nullptr, 0, &camera);
+}
+
+} // namespace
+
+int wmain(int argc, wchar_t** argv) {
+    if (argc != 2 || (wcscmp(argv[1], L"--install") != 0 &&
+                      wcscmp(argv[1], L"--uninstall") != 0)) {
+        fwprintf(stderr, L"Usage: umbracam-host.exe --install | --uninstall\n");
+        return 2;
+    }
+
     HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     if (FAILED(hr)) {
         PrintHr(L"CoInitializeEx", hr);
@@ -57,47 +64,32 @@ int wmain() {
     }
 
     int exitCode = 0;
-    {
-        ComPtr<IMFVirtualCamera> camera;
-        hr = MFCreateVirtualCamera(MFVirtualCameraType_SoftwareCameraSource,
-                                   MFVirtualCameraLifetime_Session,
-                                   MFVirtualCameraAccess_CurrentUser,
-                                   IRCAM_FRIENDLY_NAME,
-                                   IRCAM_CLSID_STRING,
-                                   nullptr, 0, &camera);
+    ComPtr<IMFVirtualCamera> camera;
+    hr = OpenInstalledCamera(camera);
+    if (FAILED(hr)) {
+        PrintHr(L"MFCreateVirtualCamera", hr);
+        exitCode = 1;
+    } else if (wcscmp(argv[1], L"--install") == 0) {
+        hr = camera->Start(nullptr);
         if (FAILED(hr)) {
-            PrintHr(L"MFCreateVirtualCamera", hr);
+            PrintHr(L"IMFVirtualCamera::Start", hr);
             exitCode = 1;
         } else {
-            hr = camera->Start(nullptr);
-            if (FAILED(hr)) {
-                PrintHr(L"IMFVirtualCamera::Start", hr);
-                exitCode = 1;
-            } else {
-                g_stopEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-                HANDLE externalStop =
-                    CreateEventW(nullptr, TRUE, FALSE, IRCAM_STOP_EVENT_NAME);
-                SetConsoleCtrlHandler(OnConsoleCtrl, TRUE);
-
-                wprintf(L"\"%s\" is live - select it in your meeting app.\n",
-                        IRCAM_FRIENDLY_NAME);
-                wprintf(L"Press Ctrl+C to stop.\n");
-
-                HANDLE waits[2] = {g_stopEvent, externalStop};
-                DWORD count = externalStop ? 2 : 1;
-                WaitForMultipleObjects(count, waits, FALSE, INFINITE);
-
-                camera->Stop();
-                if (externalStop) {
-                    CloseHandle(externalStop);
-                }
-                CloseHandle(g_stopEvent);
-                g_stopEvent = nullptr;
-            }
-            camera->Shutdown();
+            wprintf(L"Installed \"%s\".\n", IRCAM_FRIENDLY_NAME);
+        }
+    } else {
+        hr = camera->Remove();
+        if (FAILED(hr)) {
+            PrintHr(L"IMFVirtualCamera::Remove", hr);
+            exitCode = 1;
+        } else {
+            wprintf(L"Removed \"%s\".\n", IRCAM_FRIENDLY_NAME);
         }
     }
 
+    if (camera) {
+        camera->Shutdown();
+    }
     MFShutdown();
     CoUninitialize();
     return exitCode;

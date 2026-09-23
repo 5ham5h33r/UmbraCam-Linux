@@ -1,9 +1,10 @@
 // umbracam: a consent-owning desktop companion for a Windows Hello IR camera.
 //
 // The Windows Frame Server hosts the virtual-camera DLL in a service process,
-// which cannot display privacy prompts. This process therefore owns
-// MediaCapture initialization (and its first-run consent flow), then publishes
-// the IR frames over the shared-memory protocol consumed by that DLL.
+// which cannot display privacy prompts. This process owns MediaCapture
+// initialization (and its first-run consent flow), then publishes IR frames
+// over shared memory. The system-lifetime virtual device is installed once by
+// the elevated installer helper.
 
 #include <windows.h>
 #include <shellapi.h>
@@ -19,6 +20,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cstdint>
+#include <string>
 
 #include "ir_camera_protocol.h"
 
@@ -30,6 +32,7 @@ using namespace Windows::Media::Capture::Frames;
 namespace {
 
 std::atomic_bool g_running{true};
+bool g_diagnosticMode = false;
 
 BOOL WINAPI OnConsoleControl(DWORD) {
     g_running = false;
@@ -124,27 +127,6 @@ private:
     uint8_t* view_ = nullptr;
 };
 
-PROCESS_INFORMATION StartVirtualCameraHost() {
-    wchar_t path[MAX_PATH] = {};
-    GetModuleFileNameW(nullptr, path, ARRAYSIZE(path));
-    wchar_t* fileName = wcsrchr(path, L'\\');
-    if (!fileName) {
-        throw hresult_error(E_FAIL, L"Unable to locate the bridge executable.");
-    }
-    ++fileName;
-    wcscpy_s(fileName, MAX_PATH - static_cast<size_t>(fileName - path), L"umbracam-host.exe");
-
-    STARTUPINFOW startup{};
-    startup.cb = sizeof(startup);
-    PROCESS_INFORMATION process{};
-    if (!CreateProcessW(path, nullptr, nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
-                        nullptr, nullptr, &startup, &process)) {
-        throw hresult_error(HRESULT_FROM_WIN32(GetLastError()), L"Could not start umbracam-host.exe.");
-    }
-    CloseHandle(process.hThread);
-    return process;
-}
-
 MediaFrameSourceGroup FindInfraredGroup() {
     const auto groups = MediaFrameSourceGroup::FindAllAsync().get();
 
@@ -203,6 +185,29 @@ MediaFrameSource FindInfraredSource(MediaCapture const& capture) {
 }
 
 void ShowCameraAccessError(hresult_error const& error) {
+    wchar_t executable[MAX_PATH] = {};
+    GetModuleFileNameW(nullptr, executable, ARRAYSIZE(executable));
+    wchar_t* fileName = wcsrchr(executable, L'\\');
+    if (fileName) {
+        ++fileName;
+        wcscpy_s(fileName, MAX_PATH - static_cast<size_t>(fileName - executable),
+                 L"umbracam-diagnostic.log");
+        wchar_t diagnostic[1024] = {};
+        wsprintfW(diagnostic, L"UmbraCam failed: 0x%08X %s\r\n",
+                  static_cast<unsigned>(error.code()), error.message().c_str());
+        HANDLE log = CreateFileW(executable, GENERIC_WRITE, FILE_SHARE_READ,
+                                 nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (log != INVALID_HANDLE_VALUE) {
+            DWORD written = 0;
+            WriteFile(log, diagnostic, static_cast<DWORD>(wcslen(diagnostic) * sizeof(wchar_t)),
+                      &written, nullptr);
+            CloseHandle(log);
+        }
+    }
+
+    if (g_diagnosticMode) {
+        return;
+    }
     const bool denied = error.code() == E_ACCESSDENIED;
     const wchar_t* text = denied
         ? L"Windows blocked camera access. Select OK to open Camera privacy settings, enable camera access and Let desktop apps access your camera, then launch UmbraCam again."
@@ -215,8 +220,17 @@ void ShowCameraAccessError(hresult_error const& error) {
 
 } // namespace
 
-int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int) {
-    if (commandLine && wcscmp(commandLine, L"--stop") == 0) {
+int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
+    int argumentCount = 0;
+    LPWSTR* arguments = CommandLineToArgvW(GetCommandLineW(), &argumentCount);
+    const bool stopRequested = arguments && argumentCount == 2 &&
+        wcscmp(arguments[1], L"--stop") == 0;
+    g_diagnosticMode = arguments && argumentCount == 2 &&
+        wcscmp(arguments[1], L"--diagnose") == 0;
+    if (arguments) {
+        LocalFree(arguments);
+    }
+    if (stopRequested) {
         HANDLE stopEvent = OpenEventW(EVENT_MODIFY_STATE, FALSE, IRCAM_STOP_EVENT_NAME);
         if (stopEvent) {
             SetEvent(stopEvent);
@@ -226,7 +240,6 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int) {
     }
 
     SetConsoleCtrlHandler(OnConsoleControl, TRUE);
-    PROCESS_INFORMATION host{};
     HANDLE stopEvent = nullptr;
 
     try {
@@ -234,7 +247,6 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int) {
         // is delivered from a worker/MTA context. The app still owns the
         // privacy error UI below, but capture itself must not block an STA.
         init_apartment(apartment_type::multi_threaded);
-        host = StartVirtualCameraHost();
         stopEvent = CreateEventW(nullptr, TRUE, FALSE, IRCAM_STOP_EVENT_NAME);
 
         const auto infraredGroup = FindInfraredGroup();
@@ -314,10 +326,6 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int) {
     if (stopEvent) {
         SetEvent(stopEvent);
         CloseHandle(stopEvent);
-    }
-    if (host.hProcess) {
-        WaitForSingleObject(host.hProcess, 5'000);
-        CloseHandle(host.hProcess);
     }
     return 0;
 }

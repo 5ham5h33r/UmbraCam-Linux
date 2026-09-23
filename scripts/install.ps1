@@ -11,13 +11,17 @@ function Test-Administrator {
 
 if (-not (Test-Administrator)) {
     $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`""
-    Start-Process -FilePath powershell.exe -Verb RunAs -ArgumentList $arguments -Wait
-    exit $LASTEXITCODE
+    $elevated = Start-Process -FilePath powershell.exe -Verb RunAs -ArgumentList $arguments -Wait -PassThru
+    exit $elevated.ExitCode
 }
 
 $root = Split-Path -Parent $PSScriptRoot
 $dll = Join-Path $root 'build\IRCameraBridgeVCam.dll'
+$host = Join-Path $root 'build\umbracam-host.exe'
 if (-not (Test-Path -LiteralPath $dll)) {
+    throw "Build the project first: .\scripts\build-native.ps1"
+}
+if (-not (Test-Path -LiteralPath $host)) {
     throw "Build the project first: .\scripts\build-native.ps1"
 }
 
@@ -26,4 +30,9 @@ if ($LASTEXITCODE -ne 0) {
     throw "Virtual-camera registration failed with exit code $LASTEXITCODE"
 }
 
-Write-Host 'UmbraCam is installed. Launch .\build\umbracam.exe to request camera access and publish the camera.'
+& $host --install
+if ($LASTEXITCODE -ne 0) {
+    throw "Virtual-camera activation failed with exit code $LASTEXITCODE"
+}
+
+Write-Host 'UmbraCam is installed. Launch .\build\umbracam.exe to publish IR frames to the UmbraCam IR Camera device.'

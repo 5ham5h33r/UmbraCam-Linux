@@ -85,7 +85,10 @@ int CheckVirtualCameraRegistration() {
             UINT32 length = 0;
             if (SUCCEEDED(devices[index]->GetAllocatedString(
                     MF_DEVSOURCE_ATTRIBUTE_FRIENDLY_NAME, &name, &length))) {
-                found |= wcscmp(name, L"UmbraCam IR Camera") == 0;
+                wprintf(L"Camera: %s\n", name);
+                // Windows appends "Windows Virtual Camera" to the supplied
+                // friendly name, so match our stable product-name prefix.
+                found |= wcsncmp(name, L"UmbraCam IR Camera", 17) == 0;
                 CoTaskMemFree(name);
             }
             devices[index]->Release();
