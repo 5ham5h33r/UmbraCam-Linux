@@ -93,6 +93,26 @@ Stop the publisher after the call with:
 .\build\umbracam.exe --stop
 ```
 
+## IR flicker reduction
+
+Some Windows Hello sensors alternate illuminated and ambient IR exposures.
+UmbraCam now uses the illuminated frames once the driver identifies them,
+holding the last frame between exposures. On the tested 15 fps sensor this
+produces about 7.5 distinct images per second, repeated by the virtual camera.
+This removes the measured bright/dark alternation without motion-blending.
+Unknown illumination metadata and ambient-only sensors pass through; capture
+also falls back to ambient frames if no illuminated frame arrives for a second.
+
+For comparison, launch `build\umbracam.exe --all-ir-frames` to show both phases.
+Stop the existing publisher before switching modes. The default needs no flag.
+The read-only `build\umbracam-probe.exe --analyze-flicker` measures 90 distinct
+IR frames and compares brightness variation with and without frame selection.
+Run it with the publisher stopped. It reports numbers, not recorded images.
+
+This addresses alternating IR exposures, not every possible stripe caused by
+lighting or sensor readout. The tested camera does not expose standard exposure
+or power-line anti-flicker controls.
+
 To remove the registration later, run `.\scripts\uninstall.ps1`; it also asks
 for UAC consent.
 Uninstall removes the virtual device and COM registration; versioned runtime
