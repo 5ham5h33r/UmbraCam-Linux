@@ -23,6 +23,7 @@
 #include <string>
 
 #include "ir_camera_protocol.h"
+#include "ir_frame_policy.h"
 
 using namespace winrt;
 using namespace Windows::Graphics::Imaging;
@@ -223,10 +224,14 @@ void ShowCameraAccessError(hresult_error const& error) {
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     int argumentCount = 0;
     LPWSTR* arguments = CommandLineToArgvW(GetCommandLineW(), &argumentCount);
-    const bool stopRequested = arguments && argumentCount == 2 &&
-        wcscmp(arguments[1], L"--stop") == 0;
-    g_diagnosticMode = arguments && argumentCount == 2 &&
-        wcscmp(arguments[1], L"--diagnose") == 0;
+    bool stopRequested = false;
+    bool allIrFrames = false;
+    for (int i = 1; arguments && i < argumentCount; ++i) {
+        if (wcscmp(arguments[i], L"--stop") == 0) stopRequested = true;
+        else if (wcscmp(arguments[i], L"--diagnose") == 0) g_diagnosticMode = true;
+        else if (wcscmp(arguments[i], L"--all-ir-frames") == 0) allIrFrames = true;
+        else { LocalFree(arguments); return 2; }
+    }
     if (arguments) {
         LocalFree(arguments);
     }
@@ -254,7 +259,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         settings.SourceGroup(infraredGroup);
         settings.StreamingCaptureMode(StreamingCaptureMode::Video);
         MediaCapture capture;
-        // Windows displays its first-use consent dialog from this STA UI thread.
+        // Unpackaged desktop apps use Windows' desktop-camera privacy policy.
         settings.SharingMode(MediaCaptureSharingMode::ExclusiveControl);
         try {
             capture.InitializeAsync(settings).get();
@@ -295,12 +300,32 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         }
 
         SharedFrameWriter writer;
+        IrFramePolicy framePolicy;
+        int64_t previousFrameTime = -1;
         while (g_running) {
             if (stopEvent && WaitForSingleObject(stopEvent, 0) == WAIT_OBJECT_0) {
                 break;
             }
             if (auto frame = reader.TryAcquireLatestFrame()) {
+                auto timestamp = frame.SystemRelativeTime();
+                if (timestamp && timestamp.Value().count() == previousFrameTime) {
+                    frame.Close();
+                    Sleep(10);
+                    continue;
+                }
+                if (timestamp) previousFrameTime = timestamp.Value().count();
                 if (auto video = frame.VideoMediaFrame()) {
+                    std::optional<bool> illuminated;
+                    try {
+                        if (auto infrared = video.InfraredMediaFrame()) illuminated = infrared.IsIlluminated();
+                    } catch (hresult_error const&) {
+                        // Missing vendor metadata must not stop capture.
+                    }
+                    if (!allIrFrames && !framePolicy.Accept(illuminated, GetTickCount64())) {
+                        frame.Close();
+                        Sleep(10);
+                        continue;
+                    }
                     auto bitmap = video.SoftwareBitmap();
                     if (!bitmap && video.Direct3DSurface()) {
                         bitmap = SoftwareBitmap::CreateCopyFromSurfaceAsync(
@@ -310,6 +335,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                         writer.Publish(bitmap);
                     }
                 }
+                frame.Close();
             }
             Sleep(10);
         }
