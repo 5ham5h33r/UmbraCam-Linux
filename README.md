@@ -57,10 +57,12 @@ Windows UAC prompt because the Frame Server needs a machine-wide registration:
 .\build\umbracam.exe
 ```
 
-On first launch, the bridge initializes `MediaCapture` from its STA UI thread,
-which asks Windows for camera consent when consent has not already been
-decided. If access is blocked, it opens the Camera privacy settings page rather
-than changing a Windows privacy setting itself.
+On first launch, the bridge requests camera access by initializing
+`MediaCapture` from its STA UI thread. Windows can show its consent UI when the
+system supports per-app consent. For an unpackaged desktop app, Windows may
+instead rely on the system-wide **Let desktop apps access your camera** switch.
+If access is blocked, UmbraCam displays its own explanation and opens the
+Camera privacy settings page; it never changes a Windows privacy setting itself.
 
 Once UmbraCam is running, select **UmbraCam IR Camera** in Google Meet. The
 virtual camera is session-scoped and disappears cleanly when the bridge exits.
@@ -73,3 +75,10 @@ for UAC consent.
 Do **not** replace the IR camera's OEM driver with a generic UVC driver or
 change its `SensorCameraMode` / `SkipCameraEnumeration` settings. Those are
 the settings that keep the sensor usable for Windows Hello.
+
+## Validation boundary
+
+The build and source-discovery checks can run from any developer account. The
+final frame check must run in the same interactive Windows account that will
+use Meet, Zoom, or Teams, because Windows applies camera privacy and sensor
+access by user session. Run `scripts\probe-ir.ps1` there before installing.
