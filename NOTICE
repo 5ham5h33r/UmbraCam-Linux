@@ -1,0 +1,13 @@
+This project will use the Windows Media Foundation virtual-camera API.
+
+During development, the team consulted the following MIT-licensed public
+reference implementations for API behavior and interoperability:
+
+- Microsoft Windows-Camera VirtualCamera sample
+  https://github.com/microsoft/Windows-Camera/tree/master/Samples/VirtualCamera
+- Julian's windows-ir-camera-viewer
+  https://github.com/aphongdo/windows-ir-camera-viewer
+- Felipe Ramm's webcam-wallpaper virtual camera
+  https://github.com/feliperamm/webcam-wallpaper
+
+No source from those projects is included in this initial probe feature.
