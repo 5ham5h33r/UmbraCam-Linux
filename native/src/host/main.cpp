@@ -1,4 +1,4 @@
-// ir_camera-host: registers a session-lifetime "IR Camera Bridge" with the
+// umbracam-host: registers a session-lifetime UmbraCam IR camera with the
 // Windows Frame Server and keeps it alive until stopped (Ctrl+C, or the
 // named stop event signaled by the app).
 //

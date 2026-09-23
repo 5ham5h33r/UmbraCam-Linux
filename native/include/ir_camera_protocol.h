@@ -1,6 +1,6 @@
 #pragma once
 /*
- * Shared-memory frame transport between the IR Camera Bridge app (writer) and the
+ * Shared-memory frame transport between the UmbraCam app (writer) and the
  * IRCameraBridgeVCam media source (reader), which the Windows Frame Server loads
  * inside its own service process.
  *
@@ -16,7 +16,7 @@
 
 #include <stdint.h>
 
-#define IRCAM_FRIENDLY_NAME   L"IR Camera Bridge"
+#define IRCAM_FRIENDLY_NAME   L"UmbraCam IR Camera"
 #define IRCAM_CLSID_STRING    L"{19E90705-FD06-4443-9F30-68F97F09FC9E}"
 #define IRCAM_SHM_NAME        L"Global\\IRCameraBridgeVCam_v1"
 #define IRCAM_STOP_EVENT_NAME L"Local\\IRCameraBridgeVCam_Stop"

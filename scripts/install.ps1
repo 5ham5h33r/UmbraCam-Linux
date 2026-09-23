@@ -26,4 +26,4 @@ if ($LASTEXITCODE -ne 0) {
     throw "Virtual-camera registration failed with exit code $LASTEXITCODE"
 }
 
-Write-Host 'IR Camera Bridge is installed. Launch .\build\ir_camera-bridge.exe to request camera access and publish the camera.'
+Write-Host 'UmbraCam is installed. Launch .\build\umbracam.exe to request camera access and publish the camera.'

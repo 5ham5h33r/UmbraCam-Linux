@@ -1,8 +1,8 @@
-# Windows Hello IR Camera Bridge
+# UmbraCam
 
-`Windows Hello IR Camera Bridge` makes a Windows Hello infrared sensor
-available to Google Meet, Zoom, Teams, and other webcam clients as a dedicated
-**IR Camera Bridge** device.
+`UmbraCam` makes a Windows Hello infrared sensor available to Google Meet,
+Zoom, Teams, and other webcam clients as a dedicated **UmbraCam IR Camera**
+device.
 
 It does not alter the laptop's OEM camera driver and does not use OBS. The physical
 IR sensor remains a Windows Hello sensor camera; a native Windows 11 Media
@@ -19,12 +19,12 @@ contains the native virtual-camera foundation and a consent-owning IR publisher.
 Windows Hello IR camera
         |  WinRT MediaFrameReader, SourceKind=Infrared
         v
-Windows Hello IR Camera Bridge publisher
+UmbraCam publisher
         |  grayscale conversion
         v
 Native Media Foundation virtual camera
         v
-IR Camera Bridge (Google Meet / Zoom / Teams camera list)
+UmbraCam IR Camera (Google Meet / Zoom / Teams camera list)
 ```
 
 ## Prerequisites
@@ -54,7 +54,7 @@ Windows UAC prompt because the Frame Server needs a machine-wide registration:
 ```powershell
 .\scripts\build-native.ps1
 .\scripts\install.ps1
-.\build\ir_camera-bridge.exe
+.\build\umbracam.exe
 ```
 
 On first launch, the bridge initializes `MediaCapture` from its STA UI thread,
@@ -62,7 +62,7 @@ which asks Windows for camera consent when consent has not already been
 decided. If access is blocked, it opens the Camera privacy settings page rather
 than changing a Windows privacy setting itself.
 
-Once the bridge is running, select **IR Camera Bridge** in Google Meet. The
+Once UmbraCam is running, select **UmbraCam IR Camera** in Google Meet. The
 virtual camera is session-scoped and disappears cleanly when the bridge exits.
 
 To remove the registration later, run `.\scripts\uninstall.ps1`; it also asks

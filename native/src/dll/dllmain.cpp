@@ -22,7 +22,7 @@ namespace {
 HINSTANCE g_instance = nullptr;
 
 constexpr wchar_t kClsidRoot[] = L"Software\\Classes\\CLSID\\" IRCAM_CLSID_STRING;
-constexpr wchar_t kDescription[] = L"IR Camera Bridge Virtual Camera Media Source";
+constexpr wchar_t kDescription[] = L"UmbraCam Virtual Camera Media Source";
 
 HRESULT SetRegistryValue(HKEY root, const wchar_t* subkey, const wchar_t* name,
                          const wchar_t* value) {

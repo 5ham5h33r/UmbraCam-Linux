@@ -7,7 +7,7 @@
 namespace {
 
 // SYSTEM, admins, Local Service (the Frame Server itself) and the interactive
-// user get full access; the interactive user is the IR Camera Bridge app writing
+// user get full access; the interactive user is the UmbraCam app writing
 // frames.
 constexpr wchar_t kSectionSddl[] =
     L"D:(A;;GA;;;SY)(A;;GA;;;BA)(A;;GA;;;LS)(A;;GA;;;IU)";

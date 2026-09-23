@@ -1,4 +1,4 @@
-// ir_camera-bridge: a consent-owning desktop companion for the IR Camera Bridge.
+// umbracam: a consent-owning desktop companion for a Windows Hello IR camera.
 //
 // The Windows Frame Server hosts the virtual-camera DLL in a service process,
 // which cannot display privacy prompts. This process therefore owns
@@ -131,14 +131,14 @@ PROCESS_INFORMATION StartVirtualCameraHost() {
         throw hresult_error(E_FAIL, L"Unable to locate the bridge executable.");
     }
     ++fileName;
-    wcscpy_s(fileName, MAX_PATH - static_cast<size_t>(fileName - path), L"ir_camera-host.exe");
+    wcscpy_s(fileName, MAX_PATH - static_cast<size_t>(fileName - path), L"umbracam-host.exe");
 
     STARTUPINFOW startup{};
     startup.cb = sizeof(startup);
     PROCESS_INFORMATION process{};
     if (!CreateProcessW(path, nullptr, nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
                         nullptr, nullptr, &startup, &process)) {
-        throw hresult_error(HRESULT_FROM_WIN32(GetLastError()), L"Could not start ir_camera-host.exe.");
+        throw hresult_error(HRESULT_FROM_WIN32(GetLastError()), L"Could not start umbracam-host.exe.");
     }
     CloseHandle(process.hThread);
     return process;
@@ -169,9 +169,9 @@ MediaFrameSource FindInfraredSource(MediaCapture const& capture) {
 void ShowCameraAccessError(hresult_error const& error) {
     const bool denied = error.code() == E_ACCESSDENIED;
     const wchar_t* text = denied
-        ? L"Windows blocked camera access. Select OK to open Camera privacy settings, enable camera access and Let desktop apps access your camera, then launch IR Camera Bridge again."
-        : L"IR Camera Bridge could not start the infrared capture stream. Close other camera apps and try again.";
-    MessageBoxW(nullptr, text, L"IR Camera Bridge", MB_OK | MB_ICONWARNING);
+        ? L"Windows blocked camera access. Select OK to open Camera privacy settings, enable camera access and Let desktop apps access your camera, then launch UmbraCam again."
+        : L"UmbraCam could not start the infrared capture stream. Close other camera apps and try again.";
+    MessageBoxW(nullptr, text, L"UmbraCam", MB_OK | MB_ICONWARNING);
     if (denied) {
         ShellExecuteW(nullptr, L"open", L"ms-settings:privacy-webcam", nullptr, nullptr, SW_SHOWNORMAL);
     }
@@ -220,7 +220,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     } catch (hresult_error const& error) {
         ShowCameraAccessError(error);
     } catch (...) {
-        MessageBoxW(nullptr, L"IR Camera Bridge stopped unexpectedly.", L"IR Camera Bridge",
+        MessageBoxW(nullptr, L"UmbraCam stopped unexpectedly.", L"UmbraCam",
                     MB_OK | MB_ICONERROR);
     }
 

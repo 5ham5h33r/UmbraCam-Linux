@@ -26,4 +26,4 @@ if ($LASTEXITCODE -ne 0) {
     throw "Virtual-camera removal failed with exit code $LASTEXITCODE"
 }
 
-Write-Host 'IR Camera Bridge was removed.'
+Write-Host 'UmbraCam was removed.'

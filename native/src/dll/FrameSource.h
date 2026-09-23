@@ -1,5 +1,5 @@
 #pragma once
-// Reads the latest frame published by the IR Camera Bridge app through the shared
+// Reads the latest frame published by the UmbraCam app through the shared
 // memory section described in ir_camera_protocol.h. Runs inside the Frame Server
 // service, so THIS side creates the Global\ section (services hold the
 // SeCreateGlobalPrivilege; user apps only open the section).
