@@ -53,6 +53,11 @@ path as the publisher; this is required by newer Realtek Windows Hello stacks.
 After installation, verify that the standard virtual camera is available to
 camera clients with `build\umbracam-probe.exe --check-virtual-camera`.
 
+For bounded video-stream tests, run `scripts\test-camera-streams.ps1` with
+`-Camera normal`, `-Camera component`, or `-Camera virtual`. See
+[the hardware test report](docs/testing-2026-09-23.md) for actual results and
+remaining validation gaps.
+
 ## Build and run
 
 Build from Windows PowerShell, then run the installer. It displays the normal

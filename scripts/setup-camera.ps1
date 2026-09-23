@@ -82,7 +82,9 @@ try {
         }
         $dll = Join-Path $runtimeDirectory 'IRCameraBridgeVCam.dll'
         Write-Host "Registering media source: $dll"
-        $registration = Start-Process -FilePath "$env:WINDIR\System32\regsvr32.exe" -ArgumentList "/s `"$dll`"" -Wait -PassThru
+        $registration = Start-Process -FilePath "$env:WINDIR\System32\regsvr32.exe" -ArgumentList "/s `"$dll`"" -PassThru
+        $null = $registration.Handle
+        $registration.WaitForExit()
         if ($registration.ExitCode -ne 0) {
             throw "Media-source registration failed: $($registration.ExitCode)"
         }
@@ -104,7 +106,9 @@ try {
         if ($registeredSource -and (Test-Path -LiteralPath $registeredSource.'(default)')) {
             $dll = $registeredSource.'(default)'
         }
-        $registration = Start-Process -FilePath "$env:WINDIR\System32\regsvr32.exe" -ArgumentList "/u /s `"$dll`"" -Wait -PassThru
+        $registration = Start-Process -FilePath "$env:WINDIR\System32\regsvr32.exe" -ArgumentList "/u /s `"$dll`"" -PassThru
+        $null = $registration.Handle
+        $registration.WaitForExit()
         if ($registration.ExitCode -ne 0) {
             throw "Media-source unregistration failed: $($registration.ExitCode)"
         }

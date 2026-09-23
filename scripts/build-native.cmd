@@ -28,4 +28,7 @@ cl /nologo /std:c++20 /EHsc /I "%ROOT%\native\include" /I "%CPPWINRT%" /Fo:"%BUI
 if errorlevel 1 exit /b %errorlevel%
 
 cl /nologo /std:c++20 /EHsc /I "%CPPWINRT%" /Fo:"%BUILD%\umbracam-probe.obj" "%ROOT%\native\src\probe\main.cpp" /Fe:"%BUILD%\umbracam-probe.exe" /link windowsapp.lib runtimeobject.lib mf.lib mfplat.lib mfuuid.lib ole32.lib
+if errorlevel 1 exit /b %errorlevel%
+
+cl /nologo /std:c++20 /EHsc /Fo:"%BUILD%\umbracam-stream-test.obj" "%ROOT%\native\src\probe\stream-test.cpp" /Fe:"%BUILD%\umbracam-stream-test.exe" /link mf.lib mfplat.lib mfreadwrite.lib mfuuid.lib ole32.lib
 exit /b %errorlevel%
