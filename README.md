@@ -12,8 +12,10 @@ Foundation virtual-camera source publishes a separate, standard camera device.
 
 The project is being developed in small, reviewable feature branches. It now
 contains the native virtual-camera foundation and a consent-owning IR publisher.
-Physical IR capture has passed on the development laptop. Virtual-camera
-installation and end-to-end video are still undergoing hardware validation.
+Physical IR capture, elevated installation, installed virtual-camera streaming,
+Chrome WebRTC preview and publisher shutdown have passed on the development
+laptop. An actual Google Meet call has not been tested; see the hardware report
+for the concurrent-client limitation.
 
 ## Architecture
 
