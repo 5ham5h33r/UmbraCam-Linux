@@ -8,7 +8,8 @@ or camera-setting writes are involved. Images and weights belong under ignored
 
 DDColor is an ordinary image colorizer, not a model trained on this IR sensor.
 The purpose is to test feasibility and failure modes, not recover true colors.
-Outputs are independent frame predictions; there is no temporal stabilization.
+The initial runner uses independent predictions. The optional experiments below
+add temporal stabilization and person-first inference.
 
 ## Dependencies
 
@@ -107,3 +108,54 @@ estimates: inspect head turns, hands, occlusions and image edges for color trail
 Metrics record chroma strength so reduced variation cannot be quietly explained
 as removing all color. This short test does not establish long-call stability,
 performance under other GPU loads, or correctness on new faces/scenes.
+
+## Person-first inference (third experiment)
+
+Add `--person-weights build/color-models/person-deeplab.pth` to the stabilization
+command to segment the person before colorization. Download the official
+[DeepLabV3-MobileNetV3 checkpoint](https://download.pytorch.org/models/deeplabv3_mobilenet_v3_large-fc3c493d.pth)
+to that path. SHA256:
+`fc3c493d68e89cc31ef488c803d5d7dd2f3190fb570598faa49fef69be8e5e70`.
+No extra Python packages are required beyond the pinned environment above.
+
+The segmenter runs FP32 on CUDA, selects the largest person component, then
+tracks a padded square crop. Background pixels are replaced with neutral gray
+**before** DDColor sees the crop. The crop grows as needed and its center is
+smoothed causally. Color memory is gated by both current and warped person masks.
+The result is composited onto the original grayscale scene, with inward feathering
+and a two-pixel boundary trim. Missing detection returns grayscale and clears the
+crop tracker. All three networks require CUDA; mask cleanup uses CPU OpenCV.
+
+```powershell
+.\build\color-venv\Scripts\python.exe experiments\colorization\test_person_focus.py
+.\build\color-venv\Scripts\python.exe experiments\colorization\stabilize-clip.py `
+  --source build\DDColor --weights build\color-models\modelscope.bin `
+  --config build\color-models\modelscope-config.json `
+  --flow-weights build\color-models\raft-small.pth `
+  --person-weights build\color-models\person-deeplab.pth `
+  --clip build\my-new-clip\raw --output build\my-new-clip\person-result
+.\build\color-venv\Scripts\python.exe experiments\colorization\compare-person.py `
+  --clip build\my-new-clip\raw --full-frame build\my-new-clip\stable-result `
+  --person build\my-new-clip\person-result --output build\my-new-clip\person-comparison
+```
+
+Use outputs from exactly the same raw clip for `compare-person.py`; it checks
+frame counts and average frame rates, not source identity. Its comparison applies
+the same silhouette to the old full-frame colors, so both variants have identical
+grayscale backgrounds. Crop magnification also changes: this is not a pure
+background-context ablation. `model-inputs/` shows what DDColor actually sees;
+`masks/` saves the compositing matte. Background equality is verified on lossless
+frames; H.264 encoding can introduce small changes near edges.
+
+The segmenter was trained on visible-light images, not this IR camera. Multiple
+people, disconnected hands and unusual poses can be missed. Crop scale only grows
+until detection is lost; a long session may need a better scale tracker. Silhouette
+jitter and colored internal edges remain possible. Neutralizing the background
+does not recover missing visible colors or correct an initially wrong reference.
+Person-mode motion metrics use only confident person pixels and cannot be compared
+directly with full-frame metrics. Coverage fields still divide by the whole frame;
+chroma-magnitude fields describe internal buffers, not just the displayed person.
+
+This remains an offline experiment; see
+[measured results](../../docs/person-color-test-2026-09-23.md). It is not installed
+or enabled in Meet.
