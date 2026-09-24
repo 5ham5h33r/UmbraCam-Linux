@@ -42,8 +42,8 @@ person at the computer is ready. Use fresh directories; existing output is rejec
 ```
 
 The capture uses the same illuminated-frame policy as UmbraCam and saves unique
-Gray8 PGM frames plus sensor timestamps. It stops after eight seconds of polling;
-initialization time is additional. When automating, wrap the capture process in a
+Gray8 PGM frames plus sensor timestamps. It discards two seconds for startup
+settling, then saves eight seconds; initialization time is additional. When automating, wrap the capture process in a
 25-second timeout and terminate only that child if it hangs.
 
 Inference requires CUDA, uses restricted `weights_only=True` loading and checks
@@ -63,3 +63,47 @@ measurement, **not** a sustained/live-call latency benchmark.
 No RGB ground truth is captured, so visual inspection can identify artifacts but
 cannot establish color accuracy. The global chroma-step statistic is affected by
 motion and is not a flicker/quality score.
+
+## Motion-tracked color memory (second experiment)
+
+`stabilize-clip.py` runs DDColor-L and torchvision RAFT-small on CUDA and compares
+independent colors with reference-anchored color memory. This is still offline,
+not a new live-camera mode. It uses the first captured frame's AI-generated
+colors, **not** a real RGB reference or an asserted true-color image.
+
+Download the official RAFT-small C_T_V2 checkpoint to `build/color-models/raft-small.pth`:
+<https://download.pytorch.org/models/raft_small_C_T_V2-01064c6d.pth>.
+SHA256: `01064c6dba73b0fc9fc8edf772248560a00a3acfd62ac6677e9eeebad9680e27`.
+No runtime network access/download is performed by the experiment scripts.
+
+```powershell
+.\build\color-venv\Scripts\python.exe experiments\colorization\test_color_memory.py
+.\build\color-venv\Scripts\python.exe experiments\colorization\stabilize-clip.py `
+  --source build\DDColor --weights build\color-models\modelscope.bin `
+  --config build\color-models\modelscope-config.json `
+  --flow-weights build\color-models\raft-small.pth `
+  --clip build\my-new-clip\raw --output build\my-new-clip\stable-result
+```
+
+The flow model tracks current-to-previous and current-to-reference motion, with
+reverse flows to check consistency. Color reuse requires valid image coordinates,
+forward/backward consistency, and similar image brightness. Trustworthy reference
+colors are retained; other trackable pixels use 98% motion-warped previous color
+and 2% current prediction. Newly revealed/unreliable pixels refresh from the
+current model. A whole-scene mismatch resets the reference. All of these operations
+affect only Lab color channels; luminance/detail always comes from the current IR
+frame, so the method is not a frozen/blurred RGB-frame average.
+
+Default flow resolution is 256x160 with six recurrent updates. Use
+`--flow-width 320 --flow-updates 12` for the more expensive comparison. DDColor
+uses 512x512, FP16 autocast; RAFT and warping use FP32 CUDA. No silent CPU fallback.
+`comparison.mp4` contains IR / independent colors / color memory;
+`stable.mp4` is the stabilized camera view alone.
+
+The motion-aligned chroma metric uses the same flow/confidence for both outputs,
+including a separate moving-pixel subset. It measures color changes, not true
+color accuracy. It also favors this algorithm because it uses its own motion
+estimates: inspect head turns, hands, occlusions and image edges for color trails.
+Metrics record chroma strength so reduced variation cannot be quietly explained
+as removing all color. This short test does not establish long-call stability,
+performance under other GPU loads, or correctness on new faces/scenes.

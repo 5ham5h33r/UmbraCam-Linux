@@ -27,7 +27,10 @@ int wmain(int argc, wchar_t** argv) {
         if (!source) throw hresult_error(E_FAIL, L"No IR frame source.");
         auto reader = capture.CreateFrameReaderAsync(source).get();
         if (reader.StartAsync().get() != MediaFrameReaderStartStatus::Success) throw hresult_error(E_FAIL);
-        const auto deadline = GetTickCount64() + 8000;
+        // Let automatic camera startup adjustments settle before choosing a
+        // reference frame; this discards frames, not camera-control writes.
+        const auto captureBegin = GetTickCount64() + 2000;
+        const auto deadline = captureBegin + 8000;
         int64_t last = -1;
         size_t count = 0;
         IrFramePolicy policy;
@@ -42,6 +45,7 @@ int wmain(int argc, wchar_t** argv) {
             std::optional<bool> illuminated;
             try { if (auto ir = video.InfraredMediaFrame()) illuminated = ir.IsIlluminated(); } catch (...) {}
             if (!policy.Accept(illuminated, GetTickCount64())) { frame.Close(); continue; }
+            if (GetTickCount64() < captureBegin) { frame.Close(); continue; }
             auto bitmap = video.SoftwareBitmap();
             if (!bitmap && video.Direct3DSurface()) bitmap = SoftwareBitmap::CreateCopyFromSurfaceAsync(video.Direct3DSurface()).get();
             if (!bitmap) { frame.Close(); continue; }
@@ -66,7 +70,7 @@ int wmain(int argc, wchar_t** argv) {
         }
         reader.StopAsync().get();
         capture.Close();
-        printf("Captured %zu unique frames in 8 seconds. Camera released.\n", count);
+        printf("Captured %zu unique frames in 8 seconds after 2-second warmup. Camera released.\n", count);
         if (count < 20) throw std::runtime_error("Too few frames; capture is not a useful video sample.");
         return 0;
     } catch (hresult_error const& e) {
