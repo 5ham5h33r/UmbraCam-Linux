@@ -62,6 +62,46 @@ remaining validation gaps.
 
 ## Build and run
 
+### One-click menu
+
+Double-click **`UmbraCam.cmd`** in the repository root. No terminal navigation is
+needed, even if the repository path contains spaces. The menu provides:
+
+- **Enable**: starts IR capture; offers local build and installation if needed.
+- **Disable**: requests graceful shutdown and verifies the publisher exits. The
+  virtual camera stays in camera lists, but UmbraCam stops capturing IR.
+- **Status**: checks device enumeration and the current session's publisher
+  processes without opening a camera. It does not verify stream health.
+- **Install / repair**: runs the existing installer with Windows UAC consent.
+- **Color [experimental]**: explains the offline experiment; live color is not
+  integrated, so this option does not launch a camera or pretend to enable color.
+- **Build**: compiles the native app using the prerequisites below.
+- **Uninstall**: requires typing `UNINSTALL`, stops capture, then requests UAC to
+  remove the system-wide virtual device/COM registration. Physical drivers and
+  recorded clips are untouched; versioned Program Files runtime files remain.
+
+Closing the menu **does not stop an enabled camera**. Use Disable after your call.
+The launcher opens a background publisher, not a permanent console. Disable stops
+UmbraCam publishers in your Windows session, including one started from another
+checkout; it never force-kills camera clients or changes Windows camera privacy.
+Only one control menu/action can run per session at a time. A startup message
+means the publisher launched, not that valid frames have been verified.
+
+A fresh source checkout needs Visual Studio 2022 C++ Build Tools and Windows SDK
+10.0.26100.0 before the build option can work. The launcher does not download
+toolchains, weights or binaries. Only installation/removal asks for administrator
+approval. Run the menu normally, not as Administrator.
+
+Scriptable equivalents (close the interactive menu first):
+
+```powershell
+.\scripts\control.ps1 -Action Enable
+.\scripts\control.ps1 -Action Status
+.\scripts\control.ps1 -Action Disable
+```
+
+### Manual commands
+
 Build from Windows PowerShell, then run the installer. It displays the normal
 Windows UAC prompt because the Frame Server needs a machine-wide registration:
 
