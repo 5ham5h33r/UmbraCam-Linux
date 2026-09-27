@@ -60,6 +60,10 @@ For bounded video-stream tests, run `scripts\test-camera-streams.ps1` with
 [the hardware test report](docs/testing-2026-09-23.md) for actual results and
 remaining validation gaps.
 
+For dark-room blanking and shutter-state investigations, see the optional
+[camera privacy diagnostics](docs/camera-privacy-diagnostics.md). These compare
+Windows capture with lower-level paths without replacing drivers or saving video.
+
 ## Build and run
 
 ### One-click menu
