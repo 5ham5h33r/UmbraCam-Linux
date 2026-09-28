@@ -13,6 +13,10 @@ compare covered and bright-room conditions. Unlike these statistics-only probes,
 those opt-in USB recordings contain image payloads and require an additional
 capture driver. They are not an uncovered dark-room reproduction.
 
+The [camera-control research](camera-control-research-2026-09-28.md) records
+confirmed FaceAuth capabilities, incompatible workaround leads, and the proposed
+controlled illumination-mode comparison. No dark-room fix is verified yet.
+
 Close UmbraCam and camera-using applications first. Build from a Developer Command
 Prompt, or use the supplied script with Visual Studio 2022 C++ Build Tools and
 Windows SDK 10.0.26100.0 installed:
