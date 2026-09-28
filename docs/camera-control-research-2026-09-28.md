@@ -5,7 +5,11 @@
 No complete dark-room fix is verified. A successful read-only query confirmed
 alternating IR illumination support. The subsequent covered-RGB comparison
 below successfully selected this mode but did not stop privacy blanking.
-This control is not a demonstrated privacy override.
+The later pre-stream test also blanked despite verified alternating mode before
+the first read. This control is not a demonstrated privacy override. The user's
+successful Linux/Gaze dark-room authentication remains evidence that this
+hardware can supply usable IR images in darkness; the OS/capture-path difference
+is not resolved by the covered-lens tests.
 
 Target: ASUS GA403WR, physical camera USB VID 3277 / PID 0060, IR interface MI_02.
 This report extends the [USB trace findings](usb-camera-trace-2026-09-28.md).
@@ -161,6 +165,84 @@ confirmed `0x1`. Both cameras and the DFU device reported OK, and no diagnostic
 processes remained. No frames were saved. The ignored local statistics log is
 `build/mode-uncovered-33892d6b6a11458e8e16f4797bda1dc0/probe.log`.
 
+## Alternating mode before capture: 60-second test
+
+The user approved reproducing the startup order found in Gaze's source. They
+could not make the room dark and explicitly confirmed only the RGB lens was
+covered, with the IR lens/emitter clear. This is a **covered-RGB comparison**,
+not a new uncovered dark-room result. Coverage was user-controlled.
+
+The reproducible diagnostic is now tracked at
+`experiments/capture/compare-faceauth.cpp`, with usage/limitations in that
+directory's README and build script `scripts/build-faceauth-probe.cmd`.
+It sets FaceAuth `0x2` immediately after opening the IR Media Foundation source,
+before creating the Source Reader, selecting the native format, or requesting
+any samples. No RGB stream is opened. This tests the relevant ordering but does
+not reproduce all Linux/UVC initialization: Windows source creation itself can
+already perform device initialization.
+
+Fresh GETs confirmed the following sequence:
+
+```text
+initial                  flags=0x1 capabilities=0x3
+before-reader-creation   flags=0x2 capabilities=0x3 (after successful SET)
+after-reader-creation    flags=0x2 capabilities=0x3
+after-format-selection   flags=0x2 capabilities=0x3
+before-first-read        flags=0x2 capabilities=0x3
+```
+
+Native 640x400 Gray8, stride 640, converters disabled, 60-second capture:
+
+- 898 frames total: 20 nonuniform and 878 entirely gray at value 144.
+- At 0.17 s: privacy 0, min/max 13/255, standard deviation 61.691.
+- At 1.17 s: privacy 0, 16 frames received, none uniform.
+- At 2.17 s: privacy 1, 30 frames received, 10 already uniform gray.
+- From that point through the final report at 59.17 s, privacy remained 1 in
+  every sampled GET and no further nonuniform frames were counted.
+- FaceAuth remained `0x2` at every sampled in-stream GET. Format negotiation
+  did not visibly reset the selected mode.
+
+Privacy was sampled about once per second, so the exact transition instant is
+not established. No frames were saved or visually inspected: the initial
+nonuniform frames are not proof of recognizable face-image quality. No USB trace
+was captured. There was no concurrent fresh-source baseline in this run; the
+earlier live-switch comparison is historical context, not a controlled proof
+that pre-stream mode improved startup frames.
+
+The result rules out this particular high-level pre-stream SET as a sustained
+workaround for the covered-RGB condition. It does not establish what would
+happen with both lenses uncovered in actual darkness, nor how the user's exact
+installed Gaze version initializes the camera. Successful brief authentication
+and sustained video-call capture remain distinct tests.
+
+The normal cleanup flush, restoration to the original `0x1`, and source shutdown
+all succeeded (exit 0). The 85-second outer watchdog did not fire. A separate
+fresh-source `--query` independently confirmed `0x1`, then shut down normally.
+Both physical cameras, the composite device, and DFU device reported OK, with
+zero diagnostic/UmbraCam processes remaining. No drivers, firmware, registry
+settings, or production capture code were changed.
+
+The build succeeded, five invalid-argument guards passed without opening a
+camera, and the existing privacy-probe runner/statistics offline tests passed.
+Ignored local logs:
+`build/mode-prestart-covered-62121628c857445a9ef46eca7df67f42/`.
+
+### Linux lead and limits
+
+The user reports that Gaze face authentication succeeds in absolute darkness on
+Linux. The examined upstream revision enables the emitter before opening IR
+capture; its generic USB fallback uses the Microsoft FaceAuth selector and
+alternating-illumination mode. This is a source-code lead, not a capture of the
+user's Linux commands or proof of their installed version/profile.
+
+- [Gaze authentication startup order](https://github.com/GunduLabs/gaze/blob/9878608830e44b9480a50575ff34d0a69bbc13ab/gaze/src/daemon.rs#L4368-L4396)
+- [Gaze generic USB IR controls](https://github.com/GunduLabs/gaze/blob/9878608830e44b9480a50575ff34d0a69bbc13ab/gaze-core/src/ir/led.rs)
+
+The next distinguishing evidence would be a sustained Linux IR preview under
+the same uncovered dark conditions, its exact Gaze/configuration version, and
+a comparison of Linux vs Windows USB initialization. Do not infer a permanently
+defective camera or promise a replacement Windows driver from this test alone.
+
 ## Remaining validation
 
 With user approval and a genuinely dark room, both lenses uncovered:
@@ -182,8 +264,9 @@ The later approved comparison above temporarily changed the documented mode
 and streamed statistics-only samples, then restored and verified the initial
 mode. It did not establish a fix to ship in UmbraCam.
 
-If the supported mode does not prevent blanking, the remaining software route
-needs an OEM-documented control or corrected firmware. The current evidence
+If the supported mode does not prevent blanking, other routes include identifying
+the successful Linux initialization/control sequence, an OEM-documented control,
+or corrected firmware. The current evidence
 does not justify promising a registry-only fix. A support request should ask
 ASUS to investigate false RGB occlusion causing IR image replacement on this
 exact module, and provide a supported remedy that preserves normal privacy
