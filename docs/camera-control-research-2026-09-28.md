@@ -135,13 +135,31 @@ and exited with code 0. The watchdog did not fire. A separate fresh-source GET
 after shutdown independently confirmed `0x1`, then closed normally. Both
 physical cameras and the DFU device reported OK, with zero diagnostic processes
 remaining. No drivers, firmware, registry settings, or production capture code
-were changed. A brief uncovered recovery check was requested but had not yet
-been completed when this result was recorded.
+were changed. The subsequent uncovered recovery check is recorded below.
 
 The ignored local log is under
 `build/mode-covered-e6f26259086142c798dfef853866d4fc/probe.log`.
 The machine-specific comparison source/build script remains experimental under
 `build/usb-trace-tools/`; it is not a shipped capture option.
+
+### Uncovered recovery control
+
+The user then confirmed both lenses were uncovered. An approximately eight-second
+baseline-only run used the same Media Foundation source/reader and native Gray8
+format, without selecting alternating mode. It delivered 117 frames: all 117
+nonuniform, zero uniform frames, and zero gray-144 frames. Every sampled privacy
+GET returned 0; FaceAuth remained `0x1` throughout. Periodic frame standard
+deviations were approximately 29.4-32.3, versus exactly zero when covered.
+
+This confirms that uniform blanking cleared after uncovering in the bright-room
+control. Frame statistics do not independently establish visual face-image quality.
+It does not demonstrate an uncovered dark-room workaround.
+
+Flush, original-mode restoration and source shutdown succeeded; process exit was
+0 and no watchdog termination was needed. A fresh-source, non-streaming GET again
+confirmed `0x1`. Both cameras and the DFU device reported OK, and no diagnostic
+processes remained. No frames were saved. The ignored local statistics log is
+`build/mode-uncovered-33892d6b6a11458e8e16f4797bda1dc0/probe.log`.
 
 ## Remaining validation
 
