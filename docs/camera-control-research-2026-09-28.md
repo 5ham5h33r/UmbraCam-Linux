@@ -11,6 +11,12 @@ successful Linux/Gaze dark-room authentication remains evidence that this
 hardware can supply usable IR images in darkness; the OS/capture-path difference
 is not resolved by the covered-lens tests.
 
+Follow-up: [seven Windows startup/profile comparisons](camera-startup-tests-2026-09-28.md)
+also failed to sustain nonuniform IR frames with RGB covered, including explicit
+FaceAuth profiles and the combined RGB/IR group. No production workaround was
+shipped. Further investigation is Windows-only; a Linux USB trace is not a
+prerequisite and is not the user's preferred next step.
+
 Target: ASUS GA403WR, physical camera USB VID 3277 / PID 0060, IR interface MI_02.
 This report extends the [USB trace findings](usb-camera-trace-2026-09-28.md).
 The earlier uncovered dark-room kernel test and the later covered USB test are
@@ -238,10 +244,12 @@ user's Linux commands or proof of their installed version/profile.
 - [Gaze authentication startup order](https://github.com/GunduLabs/gaze/blob/9878608830e44b9480a50575ff34d0a69bbc13ab/gaze/src/daemon.rs#L4368-L4396)
 - [Gaze generic USB IR controls](https://github.com/GunduLabs/gaze/blob/9878608830e44b9480a50575ff34d0a69bbc13ab/gaze-core/src/ir/led.rs)
 
-The next distinguishing evidence would be a sustained Linux IR preview under
-the same uncovered dark conditions, its exact Gaze/configuration version, and
-a comparison of Linux vs Windows USB initialization. Do not infer a permanently
-defective camera or promise a replacement Windows driver from this test alone.
+A sustained Linux preview, exact Gaze/configuration version, and initialization
+comparison would be optional additional evidence, not requirements for further
+progress. The user declines a Linux/USB workflow. The subsequent Windows-only
+startup/profile comparisons and remaining candidates are recorded in the
+linked follow-up report. Do not infer a permanently defective camera or promise
+a replacement Windows driver from this test alone.
 
 ## Remaining validation
 
