@@ -2,9 +2,10 @@
 
 ## Status
 
-No complete dark-room fix is verified. A successful read-only query now confirms
-a documented mode worth a controlled comparison: alternating IR illumination.
-This is a candidate experiment, not a privacy-override capability.
+No complete dark-room fix is verified. A successful read-only query confirmed
+alternating IR illumination support. The subsequent covered-RGB comparison
+below successfully selected this mode but did not stop privacy blanking.
+This control is not a demonstrated privacy override.
 
 Target: ASUS GA403WR, physical camera USB VID 3277 / PID 0060, IR interface MI_02.
 This report extends the [USB trace findings](usb-camera-trace-2026-09-28.md).
@@ -102,7 +103,47 @@ camera's emitter/register command merely because one extension GUID matches.
   darkness fix for this module; no register-address or firmware writes were
   attempted.
 
-## Next discriminating experiment
+## Covered-RGB illumination-mode comparison
+
+Following the read-only research, the user approved a temporary mode comparison
+and confirmed readiness after being instructed to cover only the RGB lens while
+leaving the IR lens and emitter clear. The room was bright. Lens placement was
+user-controlled, not independently inspected. This remains a covered-lens test,
+not a genuine uncovered dark-room reproduction.
+
+A temporary native probe opened only the exact physical IR sensor using Media
+Foundation, selected native 640x400 Gray8 with converters disabled, and measured
+three approximately eight-second phases on one stream. It used an asynchronous
+Source Reader with a five-second frame wait and a 45-second outer watchdog.
+Only frame statistics were saved, not images. Fresh FaceAuth GETs and privacy
+GETs were taken approximately once per second while streaming.
+
+| Phase | Verified mode | Frames | Uniform gray (144) | Nonuniform | Privacy readings |
+| --- | --- | --- | --- | --- | --- |
+| Baseline | `0x1` general-purpose | 119 | 119 | 0 | All 1 |
+| Alternating IR | `0x2` alternating illumination | 121 | 121 | 0 | All 1 |
+| Restored baseline | `0x1` general-purpose | 122 | 122 | 0 | All 1 |
+
+The mode SET and readback succeeded. Alternating mode remained reported as
+`0x2` throughout its phase, but no image detail returned. This rules out a simple
+live mode switch as a remedy for **this covered-RGB condition**. It does not
+prove that every startup sequence or an uncovered dark-room comparison behaves
+identically. No USB trace or visual frame inspection was performed in this test.
+
+The probe restored the initial `0x1` mode, flushed and shut down successfully,
+and exited with code 0. The watchdog did not fire. A separate fresh-source GET
+after shutdown independently confirmed `0x1`, then closed normally. Both
+physical cameras and the DFU device reported OK, with zero diagnostic processes
+remaining. No drivers, firmware, registry settings, or production capture code
+were changed. A brief uncovered recovery check was requested but had not yet
+been completed when this result was recorded.
+
+The ignored local log is under
+`build/mode-covered-e6f26259086142c798dfef853866d4fc/probe.log`.
+The machine-specific comparison source/build script remains experimental under
+`build/usb-trace-tools/`; it is not a shipped capture option.
+
+## Remaining validation
 
 With user approval and a genuinely dark room, both lenses uncovered:
 
@@ -118,10 +159,10 @@ With user approval and a genuinely dark room, both lenses uncovered:
    successful setting call or intermittent nonuniform noise. Then repeat through
    UmbraCam and a browser before calling it a fix.
 
-No mode was changed in this research session; no video was streamed or saved.
-The temporary native GET probe compiled and exited normally. No diagnostic
-capture processes remained afterward. Production capture code, driver bindings,
-registry settings and firmware were unchanged.
+The initial research phase was GET-only, with no video streamed or saved.
+The later approved comparison above temporarily changed the documented mode
+and streamed statistics-only samples, then restored and verified the initial
+mode. It did not establish a fix to ship in UmbraCam.
 
 If the supported mode does not prevent blanking, the remaining software route
 needs an OEM-documented control or corrected firmware. The current evidence
