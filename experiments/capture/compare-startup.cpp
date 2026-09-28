@@ -44,8 +44,41 @@ static MediaFrameSourceGroup PhysicalGroup(bool infrared) {
     return selected;
 }
 
+static void OpenFaceAuthGroup(MediaCapture& capture) {
+    MediaFrameSourceGroup selected{nullptr};
+    unsigned matches = 0;
+    for (const auto& group : MediaFrameSourceGroup::FindAllAsync().get()) {
+        bool rgb = false, ir = false, unrelated = false;
+        for (const auto& info : group.SourceInfos()) {
+            const auto device = info.DeviceInformation();
+            const bool isRgb = device && Matches(device.Id(), L"vid_3277&pid_0060&mi_00") && info.SourceKind() == MediaFrameSourceKind::Color;
+            const bool isIr = device && Matches(device.Id(), L"vid_3277&pid_0060&mi_02") && info.SourceKind() == MediaFrameSourceKind::Infrared;
+            rgb |= isRgb; ir |= isIr; unrelated |= !isRgb && !isIr;
+        }
+        if (rgb && ir && !unrelated) { selected = group; ++matches; }
+    }
+    if (matches != 1) throw hresult_error(E_FAIL, L"Need exactly one group containing only the target RGB and IR interfaces");
+    if (!MediaCapture::IsVideoProfileSupported(selected.Id())) throw hresult_error(E_FAIL, L"Group profiles unsupported");
+    MediaCaptureVideoProfile profile{nullptr};
+    for (const auto& candidate : MediaCapture::FindAllVideoProfiles(selected.Id()))
+        if (!_wcsicmp(candidate.Id().c_str(), FaceAuthId)) profile = candidate;
+    if (!profile || profile.SupportedRecordMediaDescription().Size() != 1)
+        throw hresult_error(E_FAIL, L"Expected group FaceAuth profile/description unavailable");
+    MediaCaptureInitializationSettings settings;
+    settings.SourceGroup(selected);
+    settings.StreamingCaptureMode(StreamingCaptureMode::Video);
+    settings.SharingMode(MediaCaptureSharingMode::ExclusiveControl);
+    settings.MemoryPreference(MediaCaptureMemoryPreference::Cpu);
+    settings.VideoProfile(profile);
+    settings.RecordMediaDescription(profile.SupportedRecordMediaDescription().GetAt(0));
+    wprintf(L"OPEN_GROUP name=%s id=%s requestedProfile=%s\n", selected.DisplayName().c_str(), selected.Id().c_str(), profile.Id().c_str());
+    // Assign before InitializeAsync so the caller can close on partial failure.
+    capture = MediaCapture();
+    capture.InitializeAsync(settings).get();
+}
+
 class Stream {
-    bool ir, startAttempted = false;
+    bool ir, startAttempted = false, ownsCapture = true;
     MediaCapture capture{nullptr};
     MediaFrameReader reader{nullptr};
     CameraOcclusionInfo occlusion{nullptr};
@@ -60,29 +93,34 @@ public:
     ~Stream() { Close(); }
     const wchar_t* Name() const { return ir ? L"IR" : L"RGB"; }
     bool Active() const { return bool(reader); }
-    void Open(bool faceauth) {
-        const auto group = PhysicalGroup(ir);
-        MediaCaptureInitializationSettings settings;
-        settings.SourceGroup(group);
-        settings.StreamingCaptureMode(StreamingCaptureMode::Video);
-        settings.SharingMode(MediaCaptureSharingMode::ExclusiveControl);
-        settings.MemoryPreference(MediaCaptureMemoryPreference::Cpu);
-        if (faceauth) {
-            if (!MediaCapture::IsVideoProfileSupported(group.Id())) throw hresult_error(E_FAIL, L"Profiles unsupported");
-            MediaCaptureVideoProfile selected{nullptr};
-            for (const auto& p : MediaCapture::FindAllVideoProfiles(group.Id()))
-                if (!_wcsicmp(p.Id().c_str(), FaceAuthId)) selected = p;
-            if (!selected) throw hresult_error(E_FAIL, L"FaceAuth profile not advertised; refusing to invent one");
-            const auto descriptions = selected.SupportedRecordMediaDescription();
-            if (descriptions.Size() != 1) throw hresult_error(E_FAIL, L"Expected one FaceAuth record description");
-            settings.VideoProfile(selected);
-            settings.RecordMediaDescription(descriptions.GetAt(0));
-            wprintf(L"REQUEST stream=%s profile=%s width=%u height=%u fps=%.3f\n", Name(), selected.Id().c_str(),
-                descriptions.GetAt(0).Width(), descriptions.GetAt(0).Height(), descriptions.GetAt(0).FrameRate());
+    void Open(bool faceauth, MediaCapture groupOwner = nullptr) {
+        if (groupOwner) {
+            capture = groupOwner; ownsCapture = false;
+            wprintf(L"OPEN stream=%s sharedGroup=1 profile=FaceAuth\n", Name());
+        } else {
+            const auto group = PhysicalGroup(ir);
+            MediaCaptureInitializationSettings settings;
+            settings.SourceGroup(group);
+            settings.StreamingCaptureMode(StreamingCaptureMode::Video);
+            settings.SharingMode(MediaCaptureSharingMode::ExclusiveControl);
+            settings.MemoryPreference(MediaCaptureMemoryPreference::Cpu);
+            if (faceauth) {
+                if (!MediaCapture::IsVideoProfileSupported(group.Id())) throw hresult_error(E_FAIL, L"Profiles unsupported");
+                MediaCaptureVideoProfile selected{nullptr};
+                for (const auto& p : MediaCapture::FindAllVideoProfiles(group.Id()))
+                    if (!_wcsicmp(p.Id().c_str(), FaceAuthId)) selected = p;
+                if (!selected) throw hresult_error(E_FAIL, L"FaceAuth profile not advertised; refusing to invent one");
+                const auto descriptions = selected.SupportedRecordMediaDescription();
+                if (descriptions.Size() != 1) throw hresult_error(E_FAIL, L"Expected one FaceAuth record description");
+                settings.VideoProfile(selected);
+                settings.RecordMediaDescription(descriptions.GetAt(0));
+                wprintf(L"REQUEST stream=%s profile=%s width=%u height=%u fps=%.3f\n", Name(), selected.Id().c_str(),
+                    descriptions.GetAt(0).Width(), descriptions.GetAt(0).Height(), descriptions.GetAt(0).FrameRate());
+            }
+            wprintf(L"OPEN stream=%s group=%s profile=%s\n", Name(), group.Id().c_str(), faceauth ? L"FaceAuth" : L"default");
+            capture = MediaCapture();
+            capture.InitializeAsync(settings).get();
         }
-        wprintf(L"OPEN stream=%s group=%s profile=%s\n", Name(), group.Id().c_str(), faceauth ? L"FaceAuth" : L"default");
-        capture = MediaCapture();
-        capture.InitializeAsync(settings).get();
         MediaFrameSource source{nullptr};
         for (const auto& pair : capture.FrameSources()) {
             const auto candidate = pair.Value();
@@ -180,8 +218,10 @@ public:
         }
         occlusion = nullptr;
         if (capture) {
-            try { capture.Close(); wprintf(L"CLOSE stream=%s ok=1\n", Name()); }
-            catch (...) { ok = false; wprintf(L"CLOSE stream=%s ok=0\n", Name()); }
+            if (ownsCapture) {
+                try { capture.Close(); wprintf(L"CLOSE stream=%s ok=1\n", Name()); }
+                catch (...) { ok = false; wprintf(L"CLOSE stream=%s ok=0\n", Name()); }
+            } else { wprintf(L"DETACH stream=%s groupOwnerClosesAfterBothReaders=1\n", Name()); }
             capture = nullptr;
         }
         return ok;
@@ -212,7 +252,7 @@ int wmain(int argc, wchar_t** argv) {
     if (argc != 3) return 2;
     const std::wstring mode(argv[1]);
     if (mode != L"--ir-only" && mode != L"--rgb-first" && mode != L"--ir-first" &&
-        mode != L"--rgb-release" && mode != L"--faceauth-ir" && mode != L"--faceauth-pair") return 2;
+        mode != L"--rgb-release" && mode != L"--faceauth-ir" && mode != L"--faceauth-pair" && mode != L"--faceauth-group") return 2;
     if (!*argv[2]) return 2;
     for (auto p = argv[2]; *p; ++p) if (*p < L'0' || *p > L'9') return 2;
     wchar_t* end = nullptr;
@@ -223,10 +263,14 @@ int wmain(int argc, wchar_t** argv) {
     int result = 0;
     {
         Stream ir(true), rgb(false);
+        MediaCapture groupOwner{nullptr};
         try {
             const bool faceauth = mode == L"--faceauth-ir" || mode == L"--faceauth-pair";
             wprintf(L"RUN mode=%s seconds=%lu framesSaved=0 explicitControlSets=0\n", mode.c_str(), seconds);
-            if (mode == L"--ir-only" || mode == L"--faceauth-ir") {
+            if (mode == L"--faceauth-group") {
+                OpenFaceAuthGroup(groupOwner);
+                rgb.Open(true, groupOwner); ir.Open(true, groupOwner);
+            } else if (mode == L"--ir-only" || mode == L"--faceauth-ir") {
                 ir.Open(faceauth);
             } else if (mode == L"--ir-first") {
                 ir.Open(false); Measure(ir, rgb, L"ir-warmup", 8); rgb.Open(false);
@@ -243,6 +287,11 @@ int wmain(int argc, wchar_t** argv) {
         } catch (const std::exception& e) { printf("ERROR %s\n", e.what()); result = 1; }
         const bool rgbClosed = rgb.Close(), irClosed = ir.Close();
         if (!rgbClosed || !irClosed) result = 3;
+        if (groupOwner) {
+            try { groupOwner.Close(); wprintf(L"CLOSE_GROUP ok=1\n"); }
+            catch (...) { wprintf(L"CLOSE_GROUP ok=0\n"); result = 3; }
+            groupOwner = nullptr;
+        }
     }
     uninit_apartment();
     wprintf(L"EXIT code=%d\n", result);

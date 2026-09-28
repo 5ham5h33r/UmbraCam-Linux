@@ -63,7 +63,8 @@ does not reproduce every Linux/UVC initialization request.
   An unavailable per-profile concurrency query is logged separately from an
   empty concurrent-profile list, and does not truncate subsequent profiles.
 - `umbracam-startup-probe.exe <mode> <seconds 1..60>`: select only the physical
-  RGB MI_00 / IR MI_02 groups; compare bounded capture phases. No frame files,
+  RGB MI_00 / IR MI_02 groups (or their exact combined group in the explicit
+  group mode); compare bounded capture phases. No frame files,
   property SETs, registry writes, device enable/disable, or driver installation.
   Selecting a profile/format can change session configuration through Windows;
   this is not a claim that camera initialization sends no USB control requests.
@@ -84,6 +85,7 @@ Modes:
 | `rgb-release` | RGB alone 3 s, both 8 s, close RGB, IR for the requested duration |
 | `faceauth-ir` | Advertised FaceAuth profile, IR alone for the requested duration |
 | `faceauth-pair` | Advertised FaceAuth profiles, RGB alone 3 s, then both |
+| `faceauth-group` | One exact RGB+IR group with its FaceAuth profile; start both readers |
 
 Default-profile formats are explicitly native IR L8 640x400/15 and RGB
 NV12/YUY2 640x480/15. FaceAuth modes select the exact enumerated profile and its
@@ -91,6 +93,9 @@ single record description, logging the resulting format. No fabricated profile
 or unadvertised format is forced. Per-device profiles do not themselves prove
 concurrency is supported; a rejected pair is an inconclusive opening failure,
 not evidence about privacy blanking while streaming.
+The group mode closes both readers before closing their shared MediaCapture
+owner. Its occlusion reports are capture-group state, not independently queried
+IR/RGB device controls. No unrelated group members are permitted.
 
 IR statistics inspect CPU Gray8 pixels without conversion. RGB is counted only
 to verify ongoing delivery; its pixel content is not measured or saved. Both

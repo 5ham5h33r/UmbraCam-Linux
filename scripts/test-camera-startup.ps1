@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('ir-only','rgb-first','ir-first','rgb-release','faceauth-ir','faceauth-pair')][string]$Mode,
+    [ValidateSet('ir-only','rgb-first','ir-first','rgb-release','faceauth-ir','faceauth-pair','faceauth-group')][string]$Mode,
     [Parameter(Mandatory = $true)]
     [ValidateSet('dark-uncovered','bright-rgb-covered','bright-uncovered')][string]$Condition,
     [ValidateRange(1, 60)][int]$Seconds = 20

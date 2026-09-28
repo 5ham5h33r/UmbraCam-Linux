@@ -23,7 +23,7 @@ $cases = @{
     'umbracam-camera-profiles.exe' = @('', '--invalid', '--inventory extra')
     'umbracam-startup-probe.exe' = @('', '--invalid 1', '--ir-only', '--ir-only 0', '--ir-only 61',
         '--ir-only -1', '--ir-only 1.0', '--ir-only 1x', '--ir-only 999999999999999999999',
-        '--ir-only 1 extra', '--faceauth-ir 0', '--faceauth-pair 61', '--rgb-release +1')
+        '--ir-only 1 extra', '--faceauth-ir 0', '--faceauth-pair 61', '--rgb-release +1', '--faceauth-group 0')
 }
 $count = 0
 foreach ($binaryName in $cases.Keys) {
