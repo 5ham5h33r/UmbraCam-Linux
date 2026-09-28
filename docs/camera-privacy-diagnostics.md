@@ -8,6 +8,11 @@ They do open the selected camera, and its activity indicator can turn on.
 See the [2026-09-27 hardware results](privacy-test-2026-09-27.md) for measured
 results and limitations; these tools are not a proven dark-room workaround.
 
+The separate [2026-09-28 USB trace controls](usb-camera-trace-2026-09-28.md)
+compare covered and bright-room conditions. Unlike these statistics-only probes,
+those opt-in USB recordings contain image payloads and require an additional
+capture driver. They are not an uncovered dark-room reproduction.
+
 Close UmbraCam and camera-using applications first. Build from a Developer Command
 Prompt, or use the supplied script with Visual Studio 2022 C++ Build Tools and
 Windows SDK 10.0.26100.0 installed:
