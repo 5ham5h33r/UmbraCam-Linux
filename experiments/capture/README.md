@@ -53,3 +53,62 @@ This probe extends our own existing diagnostic and uses Windows SDK interfaces;
 it does not incorporate Gaze source code. Opening a Media Foundation source is
 still a Windows-specific operation: setting the mode before the Source Reader
 does not reproduce every Linux/UVC initialization request.
+
+## Windows RGB/IR startup comparison
+
+`scripts\build-startup-probe.cmd` builds two additional, machine-specific tools:
+
+- `umbracam-camera-profiles.exe --inventory`: enumerate physical 3277:0060
+  camera/source-group profiles without initializing MediaCapture or streaming.
+  An unavailable per-profile concurrency query is logged separately from an
+  empty concurrent-profile list, and does not truncate subsequent profiles.
+- `umbracam-startup-probe.exe <mode> <seconds 1..60>`: select only the physical
+  RGB MI_00 / IR MI_02 groups; compare bounded capture phases. No frame files,
+  property SETs, registry writes, device enable/disable, or driver installation.
+  Selecting a profile/format can change session configuration through Windows;
+  this is not a claim that camera initialization sends no USB control requests.
+
+Prefer the supervised runner, with the actual user-confirmed test condition:
+
+```powershell
+.\scripts\test-camera-startup.ps1 -Mode rgb-first -Condition bright-rgb-covered -Seconds 20
+```
+
+Modes:
+
+| Mode | Sequence |
+| --- | --- |
+| `ir-only` | IR alone for the requested duration |
+| `rgb-first` | RGB alone 3 s, then both for the requested duration |
+| `ir-first` | IR alone 8 s, then both for the requested duration |
+| `rgb-release` | RGB alone 3 s, both 8 s, close RGB, IR for the requested duration |
+| `faceauth-ir` | Advertised FaceAuth profile, IR alone for the requested duration |
+| `faceauth-pair` | Advertised FaceAuth profiles, RGB alone 3 s, then both |
+
+Default-profile formats are explicitly native IR L8 640x400/15 and RGB
+NV12/YUY2 640x480/15. FaceAuth modes select the exact enumerated profile and its
+single record description, logging the resulting format. No fabricated profile
+or unadvertised format is forced. Per-device profiles do not themselves prove
+concurrency is supported; a rejected pair is an inconclusive opening failure,
+not evidence about privacy blanking while streaming.
+
+IR statistics inspect CPU Gray8 pixels without conversion. RGB is counted only
+to verify ongoing delivery; its pixel content is not measured or saved. Both
+streams are polled, timestamps deduplicated, and absence of new frames for five
+seconds is an error. CameraOcclusionInfo support and in-stream state are logged.
+No nonuniform-frame count alone proves recognizable or acceptable video.
+
+Close other camera apps normally. The runner checks exact device health, records
+the condition and timestamps, and provides a process watchdog (duration +35 s).
+It terminates only the process it started if necessary. Each stream is stopped
+and closed on ordinary/error exit; failures are reported. A watchdog kill is NOT
+proof of normal cleanup or restored properties. Independently check the activity
+indicator and query FaceAuth mode before/after a batch using the earlier probe;
+investigate any change before further capture. Do not automatically reset an
+unknown initial mode. Logs remain ignored under `build/`.
+
+Offline argument/runner checks: `tests\startup-probe-tests.ps1`. Invalid binary
+arguments return 2 before WinRT initialization or any camera discovery.
+
+- [Profile initialization semantics](https://learn.microsoft.com/en-us/uwp/api/windows.media.capture.mediacaptureinitializationsettings.videoprofile)
+- [Supported-profile enumeration](https://learn.microsoft.com/en-us/uwp/api/windows.media.capture.mediacapture.findallvideoprofiles)
