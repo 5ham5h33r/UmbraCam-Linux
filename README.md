@@ -154,13 +154,36 @@ and modprobe configuration with the same label and `exclusive_caps=1`.
 This creates a device at boot; **it must not start capture automatically**.
 Merge options with any existing loopback configuration to preserve OBS devices.
 
+## IR flashing reduction
+
+Bright-frame holding is enabled by default. Some IR sensors alternate a useful
+illuminated exposure with a nearly black ambient exposure. UmbraCam compares
+sampled frame brightness and repeats the last bright frame during a sharp dark
+phase, preserving the output frame rate without blending motion. On a 15 fps
+alternating sensor this gives roughly 7.5 distinct images per second.
+
+The desktop's **Reduce IR flashing** checkbox controls this behavior. Disable
+and re-enable the camera after changing it. For an unfiltered comparison:
+
+```sh
+./UmbraCam.sh disable
+./UmbraCam.sh enable --all-ir-frames
+```
+
+A held image expires after one second: sustained darkness replaces the previous
+scene. Dark-only streams pass through. This is a brightness heuristic rather
+than an illumination-metadata decoder; a sudden large lighting change may
+briefly hold the old scene. It does not correct moving horizontal bands.
+**Preview raw IR** deliberately shows the unfiltered physical sensor and may
+still flash; check the virtual camera in your calling app to see the correction.
+
 ## Limitations and troubleshooting
 
 - A successful probe verifies frame delivery, not image quality. Nearly black
   frames can mean a closed shutter, low ambient IR, or an inactive IR emitter.
   UmbraCam does not send undocumented USB emitter commands or bypass shutters.
-- The Linux bridge passes through all exposures. Windows' illuminated-frame
-  filtering depends on metadata that this backend does not consume yet.
+- The Linux bridge uses brightness-based exposure selection. It does not yet
+  decode the illumination metadata used by the Windows backend.
 - Verify camera permissions through your desktop login session. Do not run the
   publisher as root or make camera nodes world-writable.
 - Sandboxed browsers and Flatpaks may need camera/portal permission. Actual

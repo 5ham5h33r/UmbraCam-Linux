@@ -54,3 +54,33 @@ journalctl --user -u umbracam.service -n 40 --no-pager
 Verify capture is stopped after testing. Never substitute a physical camera
 path for the publisher output. Brightness results depend on the scene, shutter
 and IR illumination; a frame count alone is not an image-quality check.
+
+## IR flashing correction follow-up
+
+On the same machine, raw IR frames alternated between mean luminance roughly
+24–30/255 and 0.17–0.20/255. The dark exposures contained sparse noisy pixels
+up to 94/255; a maximum-pixel threshold would not reliably identify them.
+A 90-frame virtual-camera sample before correction had mean 16.46/255 and
+temporal standard deviation 15.62. Repeated output frames made the bright/dark
+order irregular, so dropping every other output frame was unsuitable.
+
+The Linux publisher now compares sampled mean brightness before publication
+and holds the last bright exposure for up to one second through a strong dark
+phase. It preserves output cadence without averaging motion. Current darkness
+passes through after the hold expires. It is a brightness heuristic, not an
+illumination-metadata decoder.
+
+Validation on 2026-11-04:
+
+- Filtered publisher reached actual-frame readiness on the physical IR sensor.
+- Chrome webcamtests.com displayed the dedicated virtual camera at 640×400,
+  15 fps; the user confirmed that the flashing stopped and the picture was stable.
+- 35 automated tests cover alternating and irregular phases, noisy black
+  frames, normal motion, sustained darkness fallback, complete raw frame
+  boundaries, short writes and blocked-process shutdown, as well as the
+  existing backend and installer behavior.
+- The browser could hold the virtual capture node exclusively; an additional
+  FFmpeg reader received EBUSY during the browser session. No forced browser
+  termination or driver reconfiguration was used to work around that limit.
+- No recordings were saved. Conferencing calls, horizontal-band correction,
+  and a physical shutter/lighting transition remain untested.

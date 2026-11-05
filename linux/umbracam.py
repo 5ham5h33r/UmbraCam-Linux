@@ -18,6 +18,8 @@ import sys
 import time
 from dataclasses import dataclass
 
+from ir_frames import FrameRelay, stop_process as stop_child
+
 QUERYCAP = 0x80685600
 ENUM_FMT = 0xC0405602
 CAP_CAPTURE = 0x00000001
@@ -122,7 +124,13 @@ def capture_command(source, args):
 def publish_command(source, output, args):
     if source.path == output.path:
         raise ValueError("Capture and output devices must differ")
-    return capture_command(source, args) + [
+    if args.all_ir_frames:
+        command = capture_command(source, args)
+    else:
+        command = ["ffmpeg", "-hide_banner", "-loglevel", "warning", "-nostdin",
+                   "-f", "rawvideo", "-pixel_format", "gray", "-video_size", args.size,
+                   "-framerate", str(args.fps), "-i", "pipe:0", "-an"]
+    return command + [
         "-vf", "format=yuyv422",
         "-pix_fmt", "yuyv422", "-c:v", "rawvideo", "-threads", "1",
         "-progress", "pipe:1", "-stats_period", "0.25", "-f", "v4l2", output.path]
@@ -136,16 +144,6 @@ def notify(message):
         with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as channel:
             channel.connect(address)
             channel.sendall(message.encode())
-
-
-def stop_child(child):
-    if child.poll() is None:
-        child.terminate()
-        try:
-            child.wait(timeout=3)
-        except subprocess.TimeoutExpired:
-            child.kill()
-            child.wait()
 
 
 def runtime_directory():
@@ -173,7 +171,10 @@ def publish(args):
         except BlockingIOError:
             raise ValueError("UmbraCam is already capturing in this session") from None
         print(f"{source.path} → {output.path} ({args.size}, {args.fps} fps)", flush=True)
-        child = subprocess.Popen(publish_command(source, output, args), stdout=subprocess.PIPE)
+        child = subprocess.Popen(publish_command(source, output, args), stdout=subprocess.PIPE,
+                                 stdin=subprocess.DEVNULL if args.all_ir_frames else subprocess.PIPE,
+                                 bufsize=0)
+        relay = None
         stopping = False
 
         def stop(_signum, _frame):
@@ -186,9 +187,16 @@ def publish(args):
         last_count = 0
         pending = b""
         try:
+            if not args.all_ir_frames:
+                width, height = map(int, args.size.split("x"))
+                command = capture_command(source, args) + ["-vf", f"scale={width}:{height}",
+                                                            "-pix_fmt", "gray", "-f", "rawvideo", "pipe:1"]
+                relay = FrameRelay(command, child.stdin, width * height)
             with selectors.DefaultSelector() as selector:
                 selector.register(child.stdout, selectors.EVENT_READ)
                 while not stopping:
+                    if relay and relay.error:
+                        raise ValueError(f"IR frame relay failed: {relay.error}")
                     if child.poll() is not None:
                         raise ValueError(f"Capture exited ({child.returncode}); check device permissions and camera use.")
                     for key, _ in selector.select(timeout=0.5):
@@ -210,7 +218,13 @@ def publish(args):
                     if time.monotonic() - last_frame > 8:
                         raise ValueError("No new frames for eight seconds; stopping capture.")
         finally:
+            if relay:
+                relay.stop_capture()
             stop_child(child)
+            if relay:
+                relay.close()
+            elif child.stdin:
+                child.stdin.close()
             child.stdout.close()
             for sig, handler in old_handlers.items():
                 signal.signal(sig, handler)
@@ -251,6 +265,8 @@ def service(args):
                "--property=Type=notify", "--property=TimeoutStartSec=15",
                "--property=TimeoutStopSec=8", "--property=KillMode=control-group",
                str(LAUNCHER), "run", "--size", args.size, "--fps", str(args.fps)]
+    if args.all_ir_frames:
+        command.append("--all-ir-frames")
     for flag in ("source", "output"):
         value = getattr(args, flag)
         if value:
@@ -305,6 +321,8 @@ def doctor(_args):
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", nargs="?", default="menu", choices=("menu", "devices", "doctor", "probe", "preview", "run", "enable", "disable", "status", "setup"))
+    parser.add_argument("--all-ir-frames", action="store_true",
+                        help="disable bright-frame holding and pass through all IR exposures")
     parser.add_argument("--source", help="explicit GREY capture device (including /dev/v4l/by-id paths)")
     parser.add_argument("--output", help="dedicated UmbraCam loopback device")
     parser.add_argument("--size", default="640x400", help="capture size supported by the sensor (default: 640x400)")
