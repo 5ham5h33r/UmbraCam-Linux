@@ -304,7 +304,7 @@ def doctor(_args):
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("devices", "doctor", "probe", "preview", "run", "enable", "disable", "status", "setup"))
+    parser.add_argument("action", nargs="?", default="menu", choices=("menu", "devices", "doctor", "probe", "preview", "run", "enable", "disable", "status", "setup"))
     parser.add_argument("--source", help="explicit GREY capture device (including /dev/v4l/by-id paths)")
     parser.add_argument("--output", help="dedicated UmbraCam loopback device")
     parser.add_argument("--size", default="640x400", help="capture size supported by the sensor (default: 640x400)")
@@ -318,6 +318,9 @@ def parse_args(argv=None):
 def main(argv=None):
     args = parse_args(argv)
     try:
+        if args.action == "menu":
+            from gui import main as menu_main
+            return menu_main()
         if args.action in ("enable", "disable", "status"):
             return service(args)
         if args.action == "run":

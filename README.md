@@ -58,6 +58,27 @@ check `uname -r` and your distribution's kernel manager instead of installing
 stock Arch headers. Reboot first if a kernel update left your running kernel
 without matching module files. Do not mix another distribution's repositories.
 
+## Desktop app
+
+Install the optional native desktop interface:
+
+```sh
+sudo pacman -S --needed python-gobject gtk3
+python3 linux/install.py
+```
+
+Open **UmbraCam** from your application menu, or run `./UmbraCam.sh`.
+The window provides setup, enable, disable, IR preview, sensor selection and
+capture profile controls. Opening it does not start capture. Keep this checkout
+at its installed location; the shortcuts point to it. To remove the shortcuts:
+
+```sh
+./UmbraCam.sh disable
+python3 linux/install.py --uninstall
+```
+
+The command-line interface works without the optional GTK dependencies.
+
 ## Quick start
 
 ```sh
@@ -155,6 +176,8 @@ Merge options with any existing loopback configuration to preserve OBS devices.
 python3 -m unittest discover -s tests/linux -v
 python3 -m compileall -q linux
 sh -n UmbraCam.sh
+# With GTK and a graphical display (never starts capture):
+python3 tests/linux/gui_smoke.py
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the feature → dev → main workflow.

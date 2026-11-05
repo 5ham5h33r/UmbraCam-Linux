@@ -1,4 +1,5 @@
 #!/bin/sh
 set -eu
-ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+SCRIPT=$(readlink -f -- "$0")
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$SCRIPT")" && pwd)
 exec python3 "$ROOT/linux/umbracam.py" "$@"
