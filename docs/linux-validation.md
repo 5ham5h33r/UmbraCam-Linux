@@ -22,6 +22,7 @@ No images or recordings were saved during validation.
 | Default grayscale image brightness | Probe about 4/255 initially; full 15-frame sample 14.57/255, range 0–255, standard deviation 32.34; scene-dependent |
 | Unit tests | 22 pass locally on Python 3.14 |
 | Desktop GTK startup and async status | Pass on Wayland; no capture started |
+| Desktop Enable / Disable buttons | Pass; 20 independent virtual-camera frames received between actions |
 | Desktop shortcut format | Pass with desktop-file-validate, including paths with spaces and special characters |
 | Repeated enable | Rejects duplicate service without disturbing the running publisher |
 | Other Arch derivatives on physical hardware | Not tested |
