@@ -62,6 +62,11 @@ class Application(Gtk.Application):
         profile.pack_start(self.fps, False, False, 0)
         box.pack_start(profile, False, False, 0)
 
+        self.reduce_flicker = Gtk.CheckButton(label="Reduce IR flashing")
+        self.reduce_flicker.set_active(True)
+        self.reduce_flicker.set_tooltip_text("Hold the last bright exposure for up to one second during a dark phase. Disable and re-enable the camera to apply.")
+        box.pack_start(self.reduce_flicker, False, False, 0)
+
         actions = Gtk.Box(spacing=10)
         self.enable = Gtk.Button(label="Enable camera")
         self.enable.get_style_context().add_class("suggested-action")
@@ -70,7 +75,8 @@ class Application(Gtk.Application):
         self.disable = Gtk.Button(label="Disable")
         self.disable.connect("clicked", lambda _button: self.action("disable"))
         actions.pack_start(self.disable, True, True, 0)
-        self.preview = Gtk.Button(label="Preview IR")
+        self.preview = Gtk.Button(label="Preview raw IR")
+        self.preview.set_tooltip_text("Unfiltered sensor preview; bright/dark IR exposures may flash here.")
         self.preview.connect("clicked", self.open_preview)
         actions.pack_start(self.preview, True, True, 0)
         box.pack_start(actions, False, False, 0)
@@ -109,6 +115,8 @@ class Application(Gtk.Application):
             source = self.source.get_active_id()
             if source and source != "auto":
                 command.extend(["--source", source])
+        if action == "enable" and not self.reduce_flicker.get_active():
+            command.append("--all-ir-frames")
         return command
 
     def action(self, action):
@@ -194,6 +202,7 @@ class Application(Gtk.Application):
         self.disable.set_sensitive(not self.busy and self.active)
         self.preview.set_sensitive(not self.busy and not self.active and not self.previewing)
         self.setup.set_sensitive(not self.busy and not self.active)
+        self.reduce_flicker.set_sensitive(not self.busy and not self.active)
 
 
 def main():

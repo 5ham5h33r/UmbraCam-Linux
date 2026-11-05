@@ -1,4 +1,5 @@
 """Exercise GTK construction and asynchronous status updates without capture."""
+import os
 import sys
 from pathlib import Path
 
@@ -6,10 +7,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "linux"))
 from gui import Application, GLib
 
 application = Application()
+application.set_application_id(f"org.umbracam.SmokeTest.p{os.getpid()}")
 failures = []
+checked = False
 
 
 def check():
+    global checked
+    checked = True
     try:
         assert application.window.get_visible(), "Window must be visible"
         assert application.source.get_active_id() == "auto"
@@ -23,6 +28,8 @@ def check():
 
 GLib.timeout_add(1500, check)
 application.run(["gui-smoke"])
+if not checked:
+    raise SystemExit("GTK smoke check did not execute")
 if failures:
     raise SystemExit("; ".join(failures))
 print("GTK launch and asynchronous status: PASS (no capture started)")
