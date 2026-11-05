@@ -1,0 +1,31 @@
+name: Linux checks
+on:
+  push:
+    branches: [main, dev, 'feature/**', 'fix/**']
+  pull_request:
+    branches: [main, dev]
+permissions:
+  contents: read
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.11', '3.12', '3.13', '3.14']
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.1.0
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m unittest discover -s tests/linux -v
+      - run: python -m compileall -q linux
+      - run: sh -n UmbraCam.sh
+  arch:
+    runs-on: ubuntu-latest
+    container: archlinux:base
+    steps:
+      - run: pacman -Syu --noconfirm --needed git python ffmpeg kmod python-gobject gtk3 xorg-server-xvfb xorg-xauth dbus desktop-file-utils
+      - uses: actions/checkout@v7.0.1
+      - run: python -m unittest discover -s tests/linux -v
+      - run: ./UmbraCam.sh --help
+      - run: dbus-run-session -- xvfb-run -a python tests/linux/gui_smoke.py
