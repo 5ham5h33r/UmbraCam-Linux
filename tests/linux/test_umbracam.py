@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import patch, mock_open
 
 MODULE = Path(__file__).resolve().parents[2] / "linux" / "umbracam.py"
+sys.path.insert(0, str(MODULE.parent))
 spec = importlib.util.spec_from_file_location("umbracam", MODULE)
 app = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = app
@@ -92,12 +93,24 @@ class DiscoveryTests(unittest.TestCase):
 
 class CaptureTests(unittest.TestCase):
     def test_pipeline_uses_gray_input_and_browser_compatible_output(self):
-        args = app.parse_args(["run"])
+        args = app.parse_args(["run", "--all-ir-frames"])
         cmd = app.publish_command(camera(), virtual(), args)
         self.assertEqual(cmd[cmd.index("-input_format") + 1], "gray")
         self.assertEqual(cmd[cmd.index("-pix_fmt") + 1], "yuyv422")
         self.assertEqual(cmd[-1], "/dev/video10")
         self.assertNotIn("shell", cmd)
+
+    def test_default_publisher_receives_filtered_raw_frames(self):
+        command = app.publish_command(camera(), virtual(), app.parse_args(["run"]))
+        self.assertEqual(command[command.index("-i") + 1], "pipe:0")
+        self.assertEqual(command[command.index("-pixel_format") + 1], "gray")
+        self.assertNotIn(camera().path, command)
+
+    def test_bypass_option_reaches_background_publisher(self):
+        with patch.object(app, "require"), patch.object(app.subprocess, "run") as run:
+            run.return_value.returncode = 0
+            app.service(app.parse_args(["enable", "--all-ir-frames"]))
+            self.assertIn("--all-ir-frames", run.call_args.args[0])
 
     def test_same_device_is_rejected(self):
         with self.assertRaises(ValueError):
