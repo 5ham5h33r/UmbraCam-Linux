@@ -85,12 +85,24 @@ class RelayTests(unittest.TestCase):
 
     def test_shutdown_releases_a_blocked_frame_writer(self):
         import subprocess
+        import threading
+        entered_write = threading.Event()
         destination = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"],
                                        stdin=subprocess.PIPE, bufsize=0)
+        class PendingWriter:
+            def write(self, frame):
+                entered_write.set()
+                return destination.stdin.write(frame)
+
+            def close(self):
+                destination.stdin.close()
+
         relay = FrameRelay([sys.executable, "-c",
                             "import sys; sys.stdout.buffer.write(bytes([40])*4000000)"],
-                           destination.stdin, 256000)
+                           PendingWriter(), 256000)
         try:
+            self.assertTrue(entered_write.wait(timeout=5), "Relay must reach the pending write")
+            self.assertTrue(relay.worker.is_alive())
             relay.stop_capture()
             stop_process(destination)
             relay.close()
