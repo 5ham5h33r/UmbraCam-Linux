@@ -1,176 +1,165 @@
-# UmbraCam
+# UmbraCam-Linux
 
-`UmbraCam` makes a Windows Hello infrared sensor available to Google Meet,
-Zoom, Teams, and other webcam clients as a dedicated **UmbraCam IR Camera**
-device.
+Use a laptop's infrared sensor as **UmbraCam IR Camera** in webcam applications
+on Linux. The bridge captures a V4L2 grayscale stream and publishes a YUYV
+virtual camera through `v4l2loopback`. It runs locally, without OBS, Python
+packages from pip, or recorded video.
 
-It does not alter the laptop's OEM camera driver and does not use OBS. The physical
-IR sensor remains a Windows Hello sensor camera; a native Windows 11 Media
-Foundation virtual-camera source publishes a separate, standard camera device.
+Based on [UmbraCam](https://github.com/5ham5h33r/UmbraCam), with the original
+history and Windows implementation retained. GitHub does not create a second
+same-owner fork, so this is an independent derivative repository.
+The original [Windows instructions](docs/windows.md) remain available.
 
-## Status
+## Compatibility
 
-The project is being developed in small, reviewable feature branches. It now
-contains the native virtual-camera foundation and a consent-owning IR publisher.
-Physical IR capture, elevated installation, installed virtual-camera streaming,
-Chrome WebRTC preview and publisher shutdown have passed on the development
-laptop. An actual Google Meet call has not been tested; see the hardware report
-for the concurrent-client limitation.
+Targets Arch Linux and Arch derivatives, including CachyOS, EndeavourOS and
+Manjaro. The application checks Linux device capabilities; it has no dependency
+on a particular distribution, kernel name, desktop, X11, or Wayland.
 
-## Architecture
+Requirements:
 
-```text
-Windows Hello IR camera
-        |  WinRT MediaFrameReader, SourceKind=Infrared
-        v
-UmbraCam publisher
-        |  grayscale conversion
-        v
-Native Media Foundation virtual camera
-        v
-UmbraCam IR Camera (Google Meet / Zoom / Teams camera list)
+- Python 3.11 or newer, FFmpeg with V4L2 support, and `kmod`.
+- A camera exposing **GREY / 8-bit grayscale** through V4L2. Windows Hello
+  branding alone does not guarantee Linux sensor support.
+- `v4l2loopback` built for the **running** kernel.
+- A systemd desktop user session for background enable/disable; foreground
+  `run`, `probe` and `preview` also work without systemd.
+- `polkit` and a desktop authentication agent for graphical module setup.
+  A manual `sudo modprobe` alternative is documented below.
+
+The default capture profile is 640×400 at 15 fps. Use `--size WIDTHxHEIGHT`
+and `--fps N` if your sensor exposes a different profile. Device numbers are
+rediscovered on each launch; `/dev/video2` is not hardcoded.
+
+Validated on CachyOS with a Shinetech `3277:0060` IR sensor. Arch container CI
+checks the current Arch userspace. Other distributions and camera models need
+hardware validation; see [the test report](docs/linux-validation.md).
+
+## Install dependencies
+
+On Arch, CachyOS and EndeavourOS:
+
+```sh
+sudo pacman -Syu --needed python ffmpeg kmod polkit
+modinfo v4l2loopback
 ```
 
-## Prerequisites
+If `modinfo` succeeds, your kernel already provides the module. Otherwise,
+install the module sources and **matching headers**:
 
-- Windows 11 22H2 or newer (the native virtual-camera API requires Windows 11)
-- Windows camera privacy access enabled for desktop apps
-- Visual Studio 2022 Build Tools with the Desktop C++ workload (required for
-  the native virtual-camera DLL)
-
-## Development checks
-
-Build first, then run the non-installing hardware probe:
-
-```powershell
-.\scripts\build-native.ps1
-.\scripts\probe-ir.ps1
+```sh
+# Example for the stock Arch linux kernel:
+sudo pacman -S --needed v4l2loopback-dkms linux-headers
 ```
 
-The probe opens the first Media Foundation infrared source, reads one frame,
-prints its dimensions, then closes it. It creates no virtual device and changes
-no driver settings. It uses the exact native MTA and Direct3D-surface conversion
-path as the publisher; this is required by newer Realtek Windows Hello stacks.
+Use `linux-lts-headers`, `linux-zen-headers`, or `linux-cachyos-headers` when
+appropriate. Manjaro uses kernel-versioned headers, such as `linuxXYZ-headers`;
+check `uname -r` and your distribution's kernel manager instead of installing
+stock Arch headers. Reboot first if a kernel update left your running kernel
+without matching module files. Do not mix another distribution's repositories.
 
-After installation, verify that the standard virtual camera is available to
-camera clients with `build\umbracam-probe.exe --check-virtual-camera`.
+## Quick start
 
-For bounded video-stream tests, run `scripts\test-camera-streams.ps1` with
-`-Camera normal`, `-Camera component`, or `-Camera virtual`. See
-[the hardware test report](docs/testing-2026-09-23.md) for actual results and
-remaining validation gaps.
-
-For dark-room blanking and shutter-state investigations, see the optional
-[camera privacy diagnostics](docs/camera-privacy-diagnostics.md). These compare
-Windows capture with lower-level paths without replacing drivers or saving video.
-
-## Build and run
-
-### One-click menu
-
-Double-click **`UmbraCam.cmd`** in the repository root. No terminal navigation is
-needed, even if the repository path contains spaces. The menu provides:
-
-- **Enable**: starts IR capture; offers local build and installation if needed.
-- **Disable**: requests graceful shutdown and verifies the publisher exits. The
-  virtual camera stays in camera lists, but UmbraCam stops capturing IR.
-- **Status**: checks device enumeration and the current session's publisher
-  processes without opening a camera. It does not verify stream health.
-- **Install / repair**: runs the existing installer with Windows UAC consent.
-- **Color [experimental]**: explains the offline experiment; live color is not
-  integrated, so this option does not launch a camera or pretend to enable color.
-- **Build**: compiles the native app using the prerequisites below.
-- **Uninstall**: requires typing `UNINSTALL`, stops capture, then requests UAC to
-  remove the system-wide virtual device/COM registration. Physical drivers and
-  recorded clips are untouched; versioned Program Files runtime files remain.
-
-Closing the menu **does not stop an enabled camera**. Use Disable after your call.
-The launcher opens a background publisher, not a permanent console. Disable stops
-UmbraCam publishers in your Windows session, including one started from another
-checkout; it never force-kills camera clients or changes Windows camera privacy.
-Only one control menu/action can run per session at a time. A startup message
-means the publisher launched, not that valid frames have been verified.
-
-A fresh source checkout needs Visual Studio 2022 C++ Build Tools and Windows SDK
-10.0.26100.0 before the build option can work. The launcher does not download
-toolchains, weights or binaries. Only installation/removal asks for administrator
-approval. Run the menu normally, not as Administrator.
-
-Scriptable equivalents (close the interactive menu first):
-
-```powershell
-.\scripts\control.ps1 -Action Enable
-.\scripts\control.ps1 -Action Status
-.\scripts\control.ps1 -Action Disable
+```sh
+git clone https://github.com/5ham5h33r/UmbraCam-Linux.git
+cd UmbraCam-Linux
+./UmbraCam.sh doctor
+./UmbraCam.sh setup    # administrator prompt; creates virtual device only
+./UmbraCam.sh probe    # reads 15 IR frames, prints statistics, saves no video
+./UmbraCam.sh enable   # returns success after frames reach the virtual camera
 ```
 
-### Manual commands
+Select **UmbraCam IR Camera** in your camera application's device selector.
+Start the publisher before opening the selector: with `exclusive_caps=1`,
+Chromium sees the loopback as a camera only while a producer is attached.
 
-Build from Windows PowerShell, then run the installer. It displays the normal
-Windows UAC prompt because the Frame Server needs a machine-wide registration:
+After your call:
 
-```powershell
-.\scripts\build-native.ps1
-.\scripts\install.ps1
-.\build\umbracam.exe
+```sh
+./UmbraCam.sh disable
+./UmbraCam.sh status
 ```
 
-Setup copies the media-source runtime into `Program Files\UmbraCam` and grants
-the Windows camera service read/execute access to that runtime. It does not
-change access to your Documents folder. Setup prints the elevated process log
-back to the calling terminal and saves it as `build\setup-<id>.log`. Success
-requires the camera enumeration check to pass.
+Capture does not start at login or boot. Closing your terminal after `enable`
+leaves the background publisher running. Always disable after use. `status`
+reads service state without opening the physical camera. Stream failures or
+eight seconds without new frames stop the publisher; logs explain why:
 
-On first launch, the bridge requests camera access by initializing
-`MediaCapture` from a multithreaded apartment. Windows can show its consent UI when the
-system supports per-app consent. For an unpackaged desktop app, Windows may
-instead rely on the system-wide **Let desktop apps access your camera** switch.
-If access is blocked, UmbraCam displays its own explanation and opens the
-Camera privacy settings page; it never changes a Windows privacy setting itself.
-
-Once UmbraCam is installed, **UmbraCam IR Camera** is a normal camera option
-alongside the laptop's FHD camera. Launch the publisher before a call so it
-can provide IR frames, then select **UmbraCam IR Camera** in Google Meet.
-Stop the publisher after the call with:
-
-```powershell
-.\build\umbracam.exe --stop
+```sh
+journalctl --user -u umbracam.service -n 40 --no-pager
 ```
 
-## IR flicker reduction
+Other commands:
 
-Some Windows Hello sensors alternate illuminated and ambient IR exposures.
-UmbraCam now uses the illuminated frames once the driver identifies them,
-holding the last frame between exposures. On the tested 15 fps sensor this
-produces about 7.5 distinct images per second, repeated by the virtual camera.
-This removes the measured bright/dark alternation without motion-blending.
-Unknown illumination metadata and ambient-only sensors pass through; capture
-also falls back to ambient frames if no illuminated frame arrives for a second.
+```sh
+./UmbraCam.sh devices
+./UmbraCam.sh preview                  # physical IR preview; close to stop
+./UmbraCam.sh run                      # foreground publishing; Ctrl+C to stop
+./UmbraCam.sh enable --source /dev/v4l/by-id/YOUR-IR-DEVICE --size 640x400 --fps 15
+```
 
-For comparison, launch `build\umbracam.exe --all-ir-frames` to show both phases.
-Stop the existing publisher before switching modes. The default needs no flag.
-The read-only `build\umbracam-probe.exe --analyze-flicker` measures 90 distinct
-IR frames and compares brightness variation with and without frame selection.
-Run it with the publisher stopped. It reports numbers, not recorded images.
+Close preview/probe before enabling: a physical sensor may allow only one
+capture client. If multiple grayscale devices exist, select one explicitly.
+GREY identifies a grayscale candidate, not proof that a sensor is infrared.
+The publisher only writes to a loopback named **UmbraCam IR Camera**, and refuses
+physical cameras or another application's loopback.
 
-This addresses alternating IR exposures, not every possible stripe caused by
-lighting or sensor readout. The tested camera does not expose standard exposure
-or power-line anti-flicker controls.
+## Virtual camera setup
 
-To remove the registration later, run `.\scripts\uninstall.ps1`; it also asks
-for UAC consent.
-Uninstall removes the virtual device and COM registration; versioned runtime
-files remain in Program Files so a loaded camera DLL is not deleted in use.
+`setup` loads an existing module through a normal administrator authentication
+dialog. It picks a free device number starting at 10 and does not change files
+under `/etc`. Run it again after reboot. If your desktop lacks an authentication
+agent, run this in a terminal, using a free device number:
 
-## Safety
+```sh
+sudo modprobe v4l2loopback devices=1 video_nr=10 \
+  card_label='UmbraCam IR Camera' exclusive_caps=1
+```
 
-Do **not** replace the IR camera's OEM driver with a generic UVC driver or
-change its `SensorCameraMode` / `SkipCameraEnumeration` settings. Those are
-the settings that keep the sensor usable for Windows Hello.
+If OBS or another app has already loaded `v4l2loopback`, UmbraCam leaves it
+alone. With your distribution's `v4l2loopback-utils` installed, add a dedicated
+camera without unloading existing devices:
 
-## Validation boundary
+```sh
+sudo v4l2loopback-ctl add -n 'UmbraCam IR Camera' -x 1 /dev/video10
+```
 
-The build and source-discovery checks can run from any developer account. The
-final frame check must run in the same interactive Windows account that will
-use Meet, Zoom, or Teams, because Windows applies camera privacy and sensor
-access by user session. Run `scripts\probe-ir.ps1` there before installing.
+Consult `v4l2loopback-ctl add --help` for the installed version's options. To
+remove this dynamically added device, stop UmbraCam and its clients, then use
+`sudo v4l2loopback-ctl delete /dev/video10`.
+
+For optional module loading at boot, configure your distribution's modules-load
+and modprobe configuration with the same label and `exclusive_caps=1`.
+This creates a device at boot; **it must not start capture automatically**.
+Merge options with any existing loopback configuration to preserve OBS devices.
+
+## Limitations and troubleshooting
+
+- A successful probe verifies frame delivery, not image quality. Nearly black
+  frames can mean a closed shutter, low ambient IR, or an inactive IR emitter.
+  UmbraCam does not send undocumented USB emitter commands or bypass shutters.
+- The Linux bridge passes through all exposures. Windows' illuminated-frame
+  filtering depends on metadata that this backend does not consume yet.
+- Verify camera permissions through your desktop login session. Do not run the
+  publisher as root or make camera nodes world-writable.
+- Sandboxed browsers and Flatpaks may need camera/portal permission. Actual
+  Meet, Teams and Zoom calls require separate validation.
+- Without a systemd user session (for example, some Artix installations), use
+  `run` and stop it with Ctrl+C; `enable`, `disable` and `status` need systemd.
+- Secure Boot may require signing an out-of-tree DKMS module according to your
+  distribution's instructions.
+
+## Development
+
+```sh
+python3 -m unittest discover -s tests/linux -v
+python3 -m compileall -q linux
+sh -n UmbraCam.sh
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the feature → dev → main workflow.
+Upstream notices and third-party license texts remain in
+[NOTICE](NOTICE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+Implementation references: [FFmpeg's V4L2 device documentation](https://ffmpeg.org/ffmpeg-devices.html#video4linux2_002c-v4l2)
+and [v4l2loopback configuration](https://github.com/v4l2loopback/v4l2loopback#options).
